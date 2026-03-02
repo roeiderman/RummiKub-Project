@@ -60,17 +60,19 @@ const userSchema = new mongoose.Schema({
 });
 
 // Hash password before saving
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function() {
+    // 1. If password isn't changed, just stop here (Mongoose continues automatically)
     if (!this.isModified('password')) {
-        return next();
+        return; 
     }
 
+    // 2. Hash the password
     try {
         const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);
-        next();
     } catch (error) {
-        next(error);
+        // If something breaks, throwing an error tells Mongoose to stop
+        throw error;
     }
 });
 

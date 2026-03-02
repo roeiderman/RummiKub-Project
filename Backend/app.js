@@ -9,7 +9,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
-const rateLimit = require('express-rate-limit');
 
 // Import database connection
 const connectDatabase = require('./config/database');
@@ -32,19 +31,6 @@ connectDatabase();
 app.use(helmet());
 app.use(cors());
 
-// Rate limiting (general)
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 requests per window
-    message: {
-        success: false,
-        error: {
-            type: 'RateLimitError',
-            message: 'Too many requests, please try again later'
-        }
-    }
-});
-app.use(limiter);
 
 // Request logging
 app.use(morgan('dev'));
