@@ -20,3 +20,110 @@ rad.json
 *.flf
 #Test results file
 TestResults.xml
+
+### Python / YOLO Training ###
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+env/
+venv/
+ENV/
+.venv
+
+# Python distributions
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDE
+.idea/
+
+# Training outputs and models
+runs/
+wandb/
+
+# Model weights (too large for git - distribute via GitHub Releases)
+# Download from: https://github.com/yourusername/rummikub/releases
+*.pt
+*.pth
+*.onnx
+*.tflite
+*.engine
+*.torchscript
+*.mlmodel
+
+# YOLO training output folders (any folder starting with "rummikub")
+model/rummikub*/
+
+# Training artifacts
+args.yaml
+results.csv
+results.png
+train_batch*.jpg
+val_batch*.jpg
+labels.jpg
+labels_correlogram.jpg
+confusion_matrix*.png
+F1_curve.png
+P_curve.png
+R_curve.png
+PR_curve.png
+
+# Prediction outputs
+model/predict/
+predict/
+
+# Dataset (large files - keep structure but ignore actual images)
+model/dataset/images/
+model/dataset/labels/
+
+# Logs and events
+*.log
+events.out.tfevents.*
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+temp_*.jpg
+temp_*.json
+temp_*.jpeg
+temp_*.png
+
+# MacOS
+.DS_Store
+
+# Cache
+.cache/
+*.cache
+
+# Training visualizations
+visualizations/
+
+### Node.js / Backend ###
+node_modules/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

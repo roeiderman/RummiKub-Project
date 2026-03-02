@@ -1,0 +1,67 @@
+# Rummikub Tile Detection Dataset Configuration
+# IMPORTANT: Update the 'path' below to the absolute path of your dataset directory
+
+path: /Users/roeyderman/projects/RummiKub-Project/RummiKub-Project/dataset
+train: images/train
+val: images/val
+test: images/test
+
+# Number of classes
+nc: 54
+
+# Class names (54 total: 4 colors × 13 numbers + 2 jokers)
+names:
+  0: Black_1
+  1: Black_2
+  2: Black_3
+  3: Black_4
+  4: Black_5
+  5: Black_6
+  6: Black_7
+  7: Black_8
+  8: Black_9
+  9: Black_10
+  10: Black_11
+  11: Black_12
+  12: Black_13
+  13: Blue_1
+  14: Blue_2
+  15: Blue_3
+  16: Blue_4
+  17: Blue_5
+  18: Blue_6
+  19: Blue_7
+  20: Blue_8
+  21: Blue_9
+  22: Blue_10
+  23: Blue_11
+  24: Blue_12
+  25: Blue_13
+  26: Red_1
+  27: Red_2
+  28: Red_3
+  29: Red_4
+  30: Red_5
+  31: Red_6
+  32: Red_7
+  33: Red_8
+  34: Red_9
+  35: Red_10
+  36: Red_11
+  37: Red_12
+  38: Red_13
+  39: Yellow_1
+  40: Yellow_2
+  41: Yellow_3
+  42: Yellow_4
+  43: Yellow_5
+  44: Yellow_6
+  45: Yellow_7
+  46: Yellow_8
+  47: Yellow_9
+  48: Yellow_10
+  49: Yellow_11
+  50: Yellow_12
+  51: Yellow_13
+  52: Red_Joker
+  53: Black_Joker
