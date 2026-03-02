@@ -1,31 +1,116 @@
-const express = require('express')
-var app = express()
+/**
+ * Rummikub Backend API
+ * Main Express Application
+ */
 
-const users = require('./routes/users');
-
-const bodyParser = require('body-parser');
+require('dotenv').config();
+const express = require('express');
 const cors = require('cors');
-// const mongoose = require('mongoose');
-//for jwt
-const jwt = require("jsonwebtoken")
+const helmet = require('helmet');
+const morgan = require('morgan');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 
-// require('custom-env').env(process.env.NODE_ENV, './config');
-// mongoose.connect(process.env.CONNECTION_STRING,
-//     {
-//         useNewUrlParser: true,
-//         useUnifiedTopology: true
-//     });
+// Import database connection
+const connectDatabase = require('./config/database');
 
+// Import routes
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const detectionRoutes = require('./routes/detection');
+
+// Import middleware
+const errorHandler = require('./middleware/errorHandler');
+
+// Initialize Express app
+const app = express();
+
+// Connect to MongoDB
+connectDatabase();
+
+// Security middleware
+app.use(helmet());
 app.use(cors());
-app.use(express.static('public'))
-app.use(bodyParser.urlencoded({ extended: true }));
 
-//for upload photo limit
-app.use(express.json({ limit: '10mb' }))
+// Rate limiting (general)
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // 100 requests per window
+    message: {
+        success: false,
+        error: {
+            type: 'RateLimitError',
+            message: 'Too many requests, please try again later'
+        }
+    }
+});
+app.use(limiter);
+
+// Request logging
+app.use(morgan('dev'));
+
+// Response compression
+app.use(compression());
+
+// Body parser middleware
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-app.use('/api/users', users);
+// Serve static files
+app.use(express.static('public'));
 
-/*  *///enable reading the json in good format
-app.set('json spaces', 2);
-app.listen(process.env.PORT);
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/detection', detectionRoutes);
+
+// Root endpoint
+app.get('/', (req, res) => {
+    res.json({
+        message: 'Rummikub API Server',
+        version: '1.0.0',
+        endpoints: {
+            auth: {
+                register: 'POST /api/auth/register',
+                login: 'POST /api/auth/login',
+                logout: 'POST /api/auth/logout',
+                refresh: 'POST /api/auth/refresh'
+            },
+            users: {
+                profile: 'GET /api/users/profile',
+                updateProfile: 'PUT /api/users/profile',
+                statistics: 'GET /api/users/statistics'
+            },
+            detection: {
+                detect: 'POST /api/detection'
+            }
+        }
+    });
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        error: {
+            type: 'NotFoundError',
+            message: 'Endpoint not found'
+        }
+    });
+});
+
+// Global error handler (must be last)
+app.use(errorHandler);
+
+// Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`\n${'='.repeat(60)}`);
+    console.log('🎮 Rummikub API Server');
+    console.log(`${'='.repeat(60)}`);
+    console.log(`✓ Server running on: http://localhost:${PORT}`);
+    console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`${'='.repeat(60)}\n`);
+});
+
+module.exports = app;

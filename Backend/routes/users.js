@@ -1,12 +1,18 @@
-const express = require('express')
-var router = express.Router()
+/**
+ * Users Routes
+ */
 
-const controller = require('../controllers/users')
+const express = require('express');
+const router = express.Router();
+const usersController = require('../controllers/users');
+const { requireAuth } = require('../middleware/auth');
 
-router.route('/')
-            .post(controller.createUser)         
+// All routes require authentication
+router.use(requireAuth);
 
-router.route('/:id')
-            .get(controller.getUserById)
+// User routes
+router.get('/profile', usersController.getProfile);
+router.put('/profile', usersController.updateProfile);
+router.get('/statistics', usersController.getStatistics);
 
-module.exports = router
+module.exports = router;

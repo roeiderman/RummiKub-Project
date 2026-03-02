@@ -1,24 +1,63 @@
-const users = require('../services/users');
+/**
+ * Users Controller
+ */
 
-exports.getUserById = async  (req, res) => {
-    const user = await users.getUser(req.params.id)
-    if (!user)
-        return res.status(404).json({ error: 'User not found' })
-    res.json(user).end();
-}
-exports.createUser = async (req, res) => {
-    if (!req.body) return res.status(400).json({ error: "Missing request body" });
-    const { name, gender, date, email, password, confPassword, photo } = req.body
-    const newUser = await users.createUser(name, gender, date, email, password, confPassword, photo)
-    if (newUser.error) {
-        if (newUser.type === "badRequest") return res.status(400).json({ error: newUser.error })
-        return res.status(404).json({ error: newUser.error })
+const usersService = require('../services/users');
+
+/**
+ * Get current user profile
+ * GET /api/users/profile
+ */
+const getProfile = async (req, res, next) => {
+    try {
+        const user = await usersService.getProfile(req.userId);
+
+        res.status(200).json({
+            success: true,
+            data: user
+        });
+    } catch (error) {
+        next(error);
     }
-    res.status(201).location(`/api/users/${newUser.id}`).end()
-}
-exports.getUserByEmail = async (req, res) => {
-    const user = await users.getUserByEmail(req.params.id)
-    if (!user)
-        return res.status(404).json({ error: 'User not found' })
-    res.json(user).end();
-}
+};
+
+/**
+ * Update user profile
+ * PUT /api/users/profile
+ */
+const updateProfile = async (req, res, next) => {
+    try {
+        const user = await usersService.updateProfile(req.userId, req.body);
+
+        res.status(200).json({
+            success: true,
+            data: user,
+            message: 'Profile updated successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Get user statistics
+ * GET /api/users/statistics
+ */
+const getStatistics = async (req, res, next) => {
+    try {
+        const statistics = await usersService.getUserStatistics(req.userId);
+
+        res.status(200).json({
+            success: true,
+            data: statistics
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = {
+    getProfile,
+    updateProfile,
+    getStatistics
+};
