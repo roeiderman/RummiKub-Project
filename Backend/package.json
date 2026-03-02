@@ -1,0 +1,12 @@
+{
+  "name": "rummikub-backend",
+  "version": "1.0.0",
+  "description": "Backend for Rummikub tile detection and best move calculation",
+  "main": "detect.js",
+  "scripts": {
+    "test": "node detect.js ../model/tile0501.jpg"
+  },
+  "keywords": ["rummikub", "computer-vision", "yolo", "tile-detection"],
+  "author": "",
+  "license": "ISC"
+}
