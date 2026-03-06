@@ -1,137 +1,3 @@
-/**
- * Rummikub Game Logic Utility
- * Handles series detection and validation for Rummikub tiles
- */
-
-/**
- * Calculate Euclidean distance between two tiles
- */
-function calculateDistance(tile1, tile2) {
-    const dx = tile1.position.x - tile2.position.x;
-    const dy = tile1.position.y - tile2.position.y;
-    return Math.sqrt(dx * dx + dy * dy);
-}
-
-/**
- * Calculate optimal threshold based on tile density and spatial distribution
- * @param {Array} tiles - Array of detected tiles
- * @param {number} imageWidth - Image width in pixels
- * @param {number} imageHeight - Image height in pixels
- * @returns {number} Calculated threshold in pixels
- */
-function calculateOptimalThreshold(tiles, imageWidth, imageHeight) {
-    if (!tiles || tiles.length < 3) return 110; // Default for small samples
-
-    // Calculate average nearest-neighbor distance
-    let totalNNDistance = 0;
-    for (const tile of tiles) {
-        let minDist = Infinity;
-        for (const other of tiles) {
-            if (tile.id !== other.id) {
-                const dist = calculateDistance(tile, other);
-                if (dist < minDist) minDist = dist;
-            }
-        }
-        totalNNDistance += minDist;
-    }
-    const avgNNDistance = totalNNDistance / tiles.length;
-
-    // Calculate tile density
-    const imageArea = imageWidth * imageHeight;
-    const density = tiles.length / imageArea;
-
-    // Base threshold: 1.8 * average nearest-neighbor distance
-    let calculatedThreshold = avgNNDistance * 1.8;
-
-    // Apply density-based bounds
-    if (density > 0.00015) { // Very dense (like tile0509)
-        calculatedThreshold = Math.max(60, Math.min(calculatedThreshold, 85));
-    } else if (density > 0.00008) { // Medium density
-        calculatedThreshold = Math.max(70, Math.min(calculatedThreshold, 100));
-    } else { // Sparse/scattered (like tile0506, tile0508)
-        calculatedThreshold = Math.max(80, Math.min(calculatedThreshold, 180));
-    }
-
-    const category = density > 0.00015 ? 'Very dense' : density > 0.00008 ? 'Medium' : 'Sparse';
-    console.log(`🔧 Threshold calculation:
-  Avg NN distance: ${avgNNDistance.toFixed(1)}px
-  Base (1.8 * avg): ${(avgNNDistance * 1.8).toFixed(1)}px
-  Density: ${(density * 1000000).toFixed(2)}/M pixels
-  Category: ${category}
-  Final threshold: ${calculatedThreshold.toFixed(1)}px`);
-
-    return Math.round(calculatedThreshold);
-}
-
-/**
- * Group tiles by spatial proximity using distance-based clustering
- * @param {Array} tiles - Array of detected tiles
- * @param {number} threshold - Maximum distance for tiles to be in same group (null for auto-calculate)
- * @param {number} imageWidth - Image width in pixels (required for auto-calculate)
- * @param {number} imageHeight - Image height in pixels (required for auto-calculate)
- * @returns {Array} Array of tile groups
- */
-function groupTilesBySpatialProximity(tiles, threshold = null, imageWidth = null, imageHeight = null) {
-    if (!tiles || tiles.length === 0) return [];
-
-    // Auto-calculate threshold if not provided
-    if (threshold === null && imageWidth && imageHeight) {
-        threshold = calculateOptimalThreshold(tiles, imageWidth, imageHeight);
-    } else if (threshold === null) {
-        threshold = 110; // Fallback to original default
-    }
-
-    const visited = new Set();
-    const groups = [];
-
-    // Helper function to find all neighbors within threshold
-    function findNeighbors(tile, allTiles, threshold) {
-        const neighbors = [];
-        for (const other of allTiles) {
-            if (tile.id !== other.id && !visited.has(other.id)) {
-                const distance = calculateDistance(tile, other);
-                if (distance <= threshold) {
-                    neighbors.push(other);
-                }
-            }
-        }
-        return neighbors;
-    }
-
-    // DFS to build connected components
-    function buildGroup(startTile, allTiles) {
-        const group = [];
-        const stack = [startTile];
-        visited.add(startTile.id);
-
-        while (stack.length > 0) {
-            const current = stack.pop();
-            group.push(current);
-
-            const neighbors = findNeighbors(current, allTiles, threshold);
-            for (const neighbor of neighbors) {
-                if (!visited.has(neighbor.id)) {
-                    visited.add(neighbor.id);
-                    stack.push(neighbor);
-                }
-            }
-        }
-
-        return group;
-    }
-
-    // Build all groups
-    for (const tile of tiles) {
-        if (!visited.has(tile.id)) {
-            const group = buildGroup(tile, tiles);
-            if (group.length > 0) {
-                groups.push(group);
-            }
-        }
-    }
-
-    return groups;
-}
 
 /**
  * Check if a group of tiles forms a valid run
@@ -173,10 +39,12 @@ function isValidRun(tiles) {
     const gapsCount = expectedLength - numbers.length;
 
     // Check if we have enough Jokers to fill gaps
-    if (jokers.length !== gapsCount) return false;
+    // (Extra jokers can extend the sequence)
+    if (jokers.length < gapsCount) return false;
 
-    // Final length must be >= 3
-    return (regularTiles.length + jokers.length) >= 3;
+    // Ensure total run length is valid (3-13 tiles in Rummikub)
+    const totalLength = regularTiles.length + jokers.length;
+    return totalLength >= 3 && totalLength <= 13;
 }
 
 /**
@@ -219,163 +87,130 @@ function isValidSet(tiles) {
     return true;
 }
 
-/**
- * Calculate bounding box for a group of tiles
- */
-function calculateBoundingBox(tiles) {
-    if (!tiles || tiles.length === 0) return null;
+// /**
+//  * Detect and validate all series in an array of tiles
+//  * @param {Array} tiles - Array of detected tiles
+//  * @param {Object} options - Options for detection
+//  * @returns {Array} Array of series objects
+//  */
+// function detectSeries(groups) {
+//     // Analyze each group
+//     const series = [];
+//     let seriesId = 0;
 
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
+//     for (const group of groups) {
+//         // Skip single tiles
+//         if (group.length < 3) continue;
 
-    for (const tile of tiles) {
-        minX = Math.min(minX, tile.position.x);
-        maxX = Math.max(maxX, tile.position.x);
-        minY = Math.min(minY, tile.position.y);
-        maxY = Math.max(maxY, tile.position.y);
-    }
+//         // Try to validate as run
+//         const isRun = isValidRun(group);
 
-    return { minX, maxX, minY, maxY };
-}
+//         // Try to validate as set
+//         const isSet = isValidSet(group);
 
-/**
- * Detect and validate all series in an array of tiles
- * @param {Array} tiles - Array of detected tiles
- * @param {Object} options - Options for detection
- * @param {number} [options.threshold] - Optional proximity threshold (px)
- *   - If not provided: auto-calculated based on tile density
- *   - If provided: used as exact value (expert override)
- *   - Typical values: 60-120px depending on layout density
- * @param {number} [options.imageWidth] - Image width in pixels (for auto-calculate)
- * @param {number} [options.imageHeight] - Image height in pixels (for auto-calculate)
- * @returns {Array} Array of series objects
- */
-function detectSeries(tiles, options = {}) {
-    const { threshold = null, imageWidth = null, imageHeight = null } = options;
+//         // Debug logging for groups that fail validation
+//         if (!isRun && !isSet && group.length >= 3) {
+//             console.log('⚠️  Series validation failed:', {
+//                 tiles: group.map(t => `${t.color}_${t.number}`),
+//                 groupSize: group.length,
+//                 colors: [...new Set(group.map(t => t.color))],
+//                 numbers: [...new Set(group.map(t => t.number))]
+//             });
+//         }
 
-    if (!tiles || tiles.length === 0) {
-        return [];
-    }
+//         if (isRun || isSet) {
+//             // Sort tiles for consistent ordering
+//             const sortedTiles = [...group].sort((a, b) => {
+//                 if (isRun) {
+//                     // For runs, Jokers should be positioned by their gap location
+//                     // For now, put Jokers after regular tiles in sorted order
+//                     const aNum = a.number === 'Joker' || a.number === 'joker' ? Infinity : parseInt(a.number);
+//                     const bNum = b.number === 'Joker' || b.number === 'joker' ? Infinity : parseInt(b.number);
+//                     return aNum - bNum;
+//                 } else {
+//                     // For sets, Jokers go at the end
+//                     const aIsJoker = a.number === 'Joker' || a.number === 'joker';
+//                     const bIsJoker = b.number === 'Joker' || b.number === 'joker';
+//                     if (aIsJoker && !bIsJoker) return 1;
+//                     if (!aIsJoker && bIsJoker) return -1;
+//                     return a.color.localeCompare(b.color);
+//                 }
+//             });
 
-    // Group tiles by spatial proximity
-    const groups = groupTilesBySpatialProximity(tiles, threshold, imageWidth, imageHeight);
+//             const seriesObj = {
+//                 id: seriesId++,
+//                 type: isRun ? 'run' : 'set',
+//                 isValid: true,
+//                 tiles: sortedTiles.map(t => t.id),
+//                 boundingBox: calculateBoundingBox(sortedTiles)
+//             };
 
-    console.log(`📊 Spatial Grouping: ${groups.length} groups detected (threshold: ${threshold || 'auto'}px)`);
+//             if (isRun) {
+//                 // For runs, need to extract color from regular tiles (Jokers may have any color)
+//                 const regularTiles = sortedTiles.filter(t => t.number !== 'Joker' && t.number !== 'joker');
+//                 const jokerTiles = sortedTiles.filter(t => t.number === 'Joker' || t.number === 'joker');
 
-    // Analyze each group
-    const series = [];
-    let seriesId = 0;
+//                 const regularTile = regularTiles[0];
+//                 seriesObj.color = regularTile ? regularTile.color : sortedTiles[0].color;
 
-    for (const group of groups) {
-        // Skip single tiles
-        if (group.length < 3) continue;
+//                 // Extract and sort regular numbers
+//                 const regularNumbers = regularTiles.map(t => parseInt(t.number)).sort((a, b) => a - b);
 
-        // Try to validate as run
-        const isRun = isValidRun(group);
+//                 // Build complete sequence including Joker placeholders
+//                 const fullSequence = [];
+//                 if (regularNumbers.length > 0) {
+//                     const minNum = regularNumbers[0];
+//                     const maxNum = regularNumbers[regularNumbers.length - 1];
+//                     let jokerIndex = 0;
 
-        // Try to validate as set
-        const isSet = isValidSet(group);
+//                     // Fill sequence from min to max, marking Jokers in gaps
+//                     for (let i = minNum; i <= maxNum; i++) {
+//                         if (regularNumbers.includes(i)) {
+//                             fullSequence.push(i);
+//                         } else {
+//                             // This position is a gap, filled by a Joker
+//                             const joker = jokerTiles[jokerIndex++];
+//                             fullSequence.push(`${joker.color}_Joker`);
+//                         }
+//                     }
 
-        // Debug logging for groups that fail validation
-        if (!isRun && !isSet && group.length >= 3) {
-            console.log('⚠️  Series validation failed:', {
-                tiles: group.map(t => `${t.color}_${t.number}`),
-                groupSize: group.length,
-                colors: [...new Set(group.map(t => t.color))],
-                numbers: [...new Set(group.map(t => t.number))]
-            });
-        }
+//                     // Add any remaining Jokers at the end (extending the sequence)
+//                     while (jokerIndex < jokerTiles.length) {
+//                         const joker = jokerTiles[jokerIndex++];
+//                         fullSequence.push(`${joker.color}_Joker`);
+//                     }
+//                 }
+//                 seriesObj.numbers = fullSequence;
+//             } else {
+//                 // For sets, show regular number and mark Jokers in colors
+//                 const regularTiles = sortedTiles.filter(t => t.number !== 'Joker' && t.number !== 'joker');
+//                 const jokerTiles = sortedTiles.filter(t => t.number === 'Joker' || t.number === 'joker');
 
-        if (isRun || isSet) {
-            // Sort tiles for consistent ordering
-            const sortedTiles = [...group].sort((a, b) => {
-                if (isRun) {
-                    // For runs, Jokers should be positioned by their gap location
-                    // For now, put Jokers after regular tiles in sorted order
-                    const aNum = a.number === 'Joker' || a.number === 'joker' ? Infinity : parseInt(a.number);
-                    const bNum = b.number === 'Joker' || b.number === 'joker' ? Infinity : parseInt(b.number);
-                    return aNum - bNum;
-                } else {
-                    // For sets, Jokers go at the end
-                    const aIsJoker = a.number === 'Joker' || a.number === 'joker';
-                    const bIsJoker = b.number === 'Joker' || b.number === 'joker';
-                    if (aIsJoker && !bIsJoker) return 1;
-                    if (!aIsJoker && bIsJoker) return -1;
-                    return a.color.localeCompare(b.color);
-                }
-            });
+//                 seriesObj.number = regularTiles[0] ? regularTiles[0].number : sortedTiles[0].number;
+//                 seriesObj.colors = sortedTiles.map(t => {
+//                     if (t.number === 'Joker' || t.number === 'joker') {
+//                         return `${t.color}_Joker`;
+//                     }
+//                     return t.color;
+//                 });
+//             }
 
-            const seriesObj = {
-                id: seriesId++,
-                type: isRun ? 'run' : 'set',
-                isValid: true,
-                tiles: sortedTiles.map(t => t.id),
-                boundingBox: calculateBoundingBox(sortedTiles)
-            };
+//             series.push(seriesObj);
+//         }
+//     }
 
-            if (isRun) {
-                // For runs, need to extract color from regular tiles (Jokers may have any color)
-                const regularTile = sortedTiles.find(t => t.number !== 'Joker' && t.number !== 'joker');
-                seriesObj.color = regularTile ? regularTile.color : sortedTiles[0].color;
+//     // Log validation summary
+//     const invalidGroups = groups.filter(g => g.length >= 3 && !series.some(s => s.tiles.some(tId => g.some(t => t.id === tId)))).length;
+//     console.log(`✓ Valid series: ${series.length}, ✗ Invalid groups: ${invalidGroups}`);
 
-                // Extract numbers, calculating Joker positions
-                const regularNumbers = sortedTiles
-                    .filter(t => t.number !== 'Joker' && t.number !== 'joker')
-                    .map(t => parseInt(t.number))
-                    .sort((a, b) => a - b);
+//     return series;
+// }
 
-                // Build complete sequence including Joker positions
-                const fullSequence = [];
-                if (regularNumbers.length > 0) {
-                    const minNum = regularNumbers[0];
-                    const maxNum = regularNumbers[regularNumbers.length - 1];
-                    for (let i = minNum; i <= maxNum; i++) {
-                        fullSequence.push(i);
-                    }
-                }
-                seriesObj.numbers = fullSequence;
-            } else {
-                seriesObj.number = sortedTiles[0].number;
-                seriesObj.colors = sortedTiles.map(t => t.color);
-            }
 
-            series.push(seriesObj);
-        }
-    }
 
-    console.log(`✓ Valid series: ${series.length}, ✗ Invalid groups: ${groups.length - series.length}`);
-
-    return series;
-}
-
-/**
- * Add series IDs to tiles based on detected series
- */
-function assignSeriesToTiles(tiles, series) {
-    const tilesWithSeries = tiles.map(tile => ({
-        ...tile,
-        seriesId: null
-    }));
-
-    for (const s of series) {
-        for (const tileId of s.tiles) {
-            const tile = tilesWithSeries.find(t => t.id === tileId);
-            if (tile) {
-                tile.seriesId = s.id;
-            }
-        }
-    }
-
-    return tilesWithSeries;
-}
 
 module.exports = {
-    calculateDistance,
-    calculateOptimalThreshold,
-    groupTilesBySpatialProximity,
     isValidRun,
     isValidSet,
-    calculateBoundingBox,
-    detectSeries,
-    assignSeriesToTiles
+    //detectSeries,
 };

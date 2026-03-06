@@ -79,32 +79,6 @@ const requireAuth = async (req, res, next) => {
     }
 };
 
-/**
- * Optional authentication - doesn't fail if no token
- */
-const optionalAuth = async (req, res, next) => {
-    try {
-        const authHeader = req.headers.authorization;
-
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            const token = authHeader.substring(7);
-            const decoded = jwt.verify(token, JWT_SECRET);
-            const user = await User.findById(decoded.userId);
-
-            if (user) {
-                req.user = user;
-                req.userId = user._id;
-            }
-        }
-
-        next();
-    } catch (error) {
-        // Silently fail for optional auth
-        next();
-    }
-};
-
 module.exports = {
     requireAuth,
-    optionalAuth
 };
