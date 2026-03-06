@@ -78,6 +78,10 @@ def detect_tiles(image_path, show=False, save=False, json_output=None):
             color = parts[0] if len(parts) > 0 else "Unknown"
             number = parts[1] if len(parts) > 1 else "?"
 
+            # Normalize Yellow to Orange (Rummikub has 4 colors: Red, Blue, Black, Orange)
+            if color == "Yellow":
+                color = "Orange"
+
             # Extract tile info
             tile_info = {
                 "id": i,
