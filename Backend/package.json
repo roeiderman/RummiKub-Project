@@ -2,11 +2,36 @@
   "name": "rummikub-backend",
   "version": "1.0.0",
   "description": "Backend for Rummikub tile detection and best move calculation",
-  "main": "detect.js",
+  "main": "app.js",
   "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
     "test": "node detect.js ../model/tile0501.jpg"
   },
-  "keywords": ["rummikub", "computer-vision", "yolo", "tile-detection"],
+  "keywords": [
+    "rummikub",
+    "computer-vision",
+    "yolo",
+    "tile-detection"
+  ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^2.2.2",
+    "compression": "^1.8.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "express-validator": "^7.3.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.2.3",
+    "morgan": "^1.10.1",
+    "multer": "^2.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
 }

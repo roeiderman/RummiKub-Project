@@ -1,15 +1,16 @@
 /**
  * Rummikub Tile Detection - Node.js Backend
  * Receives an image and applies the YOLOv8 model to detect tiles.
- *
- * Usage:
- *   const { detectTiles } = require('./detect');
- *   detectTiles('path/to/image.jpg').then(result => console.log(result));
  */
 
+require('dotenv').config(); // <--- ADDED: Load environment variables
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+
+// Get Python path from .env or default to 'python'
+const PYTHON_EXECUTABLE = process.env.PYTHON_PATH || 'python';
+const SCRIPT_NAME = 'use_model.py'; // Name of your python script
 
 /**
  * Apply the Rummikub detection model to an image.
@@ -22,20 +23,16 @@ const fs = require('fs');
 async function detectTiles(image, options = {}) {
     const { annotate = false } = options;
     return new Promise((resolve, reject) => {
-        // Determine if input is file path or buffer
         let inputPath;
         let tempImageFile = false;
 
+        // 1. PREPARE IMAGE
         if (Buffer.isBuffer(image)) {
-            // If buffer, save to temp file
             inputPath = path.join(__dirname, 'temp_image.jpg');
             fs.writeFileSync(inputPath, image);
             tempImageFile = true;
         } else if (typeof image === 'string') {
-            // If string, assume it's a file path
             inputPath = image;
-
-            // Check if file exists
             if (!fs.existsSync(inputPath)) {
                 return reject(new Error(`Image file not found: ${inputPath}`));
             }
@@ -45,103 +42,95 @@ async function detectTiles(image, options = {}) {
 
         console.log(`Applying model to: ${inputPath}`);
 
-        // Create temp JSON output file
         const jsonOutputPath = path.join(__dirname, 'temp_detections.json');
-
-        // Get absolute path for image (use_model.py needs to work from model/ directory)
         const absoluteImagePath = path.resolve(inputPath);
-
-        // Spawn Python process with --json flag to output results
-        // Set cwd to model/ directory so relative paths in use_model.py work correctly
-        const modelDir = path.join(__dirname, '..', 'model');
-        const python = spawn('python3', [
-            'use_model.py',
+        const modelDir = path.join(__dirname, '..', '..', 'model');
+        
+        // 2. RUN PYTHON DETECTION
+        const python = spawn(PYTHON_EXECUTABLE, [
+            SCRIPT_NAME,
             absoluteImagePath,
             '--json',
             jsonOutputPath
-        ], {
-            cwd: modelDir  // Run from model/ directory
-        });
+        ], { cwd: modelDir });
 
         let errorData = '';
+        python.stderr.on('data', (data) => errorData += data.toString());
 
-        // Collect stderr data
-        python.stderr.on('data', (data) => {
-            errorData += data.toString();
-        });
-
-        // Handle process completion
         python.on('close', (code) => {
-            // Clean up temp image file if created
-            if (tempImageFile && fs.existsSync(inputPath)) {
-                fs.unlinkSync(inputPath);
-            }
+            // Note: We do NOT delete the temp file here anymore!
 
             if (code !== 0) {
                 console.error('Python process error:', errorData);
-                // Clean up temp JSON file
-                if (fs.existsSync(jsonOutputPath)) {
-                    fs.unlinkSync(jsonOutputPath);
-                }
+                if (fs.existsSync(jsonOutputPath)) fs.unlinkSync(jsonOutputPath);
+                
+                // Cleanup on error
+                if (tempImageFile && fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+                
                 return reject(new Error(`Model inference failed: ${errorData}`));
             }
 
             try {
-                // Read JSON output file
                 if (!fs.existsSync(jsonOutputPath)) {
+                    if (tempImageFile && fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
                     return reject(new Error('Model did not produce JSON output'));
                 }
 
                 const jsonData = fs.readFileSync(jsonOutputPath, 'utf8');
                 const result = JSON.parse(jsonData);
-
-                // Clean up temp JSON file
-                fs.unlinkSync(jsonOutputPath);
+                fs.unlinkSync(jsonOutputPath); // Delete JSON temp file
 
                 console.log(`Detected ${result.tiles.length} tiles`);
 
-                // Normalize result format to match expected structure
+                // Normalize tile colors (Yellow -> Orange for Rummikub standard colors)
+                const normalizedTiles = result.tiles.map(tile => ({
+                    ...tile,
+                    color: tile.color === 'Yellow' ? 'Orange' : tile.color
+                }));
+
                 const normalizedResult = {
                     success: true,
                     image: result.image,
                     image_width: result.image_width,
                     image_height: result.image_height,
-                    num_tiles_detected: result.tiles.length,
-                    tiles: result.tiles
+                    num_tiles_detected: normalizedTiles.length,
+                    tiles: normalizedTiles
                 };
 
-                // If annotate option is enabled, create annotated image
+                // 3. RUN ANNOTATION (If requested)
                 if (annotate) {
-                    saveAnnotatedImage(inputPath)
+                    saveAnnotatedImage(inputPath) // <--- Now works because file still exists!
                         .then(annotatedPath => {
                             normalizedResult.annotatedImagePath = annotatedPath;
                             resolve(normalizedResult);
                         })
                         .catch(err => {
                             console.error('Warning: Failed to create annotated image:', err.message);
-                            // Still resolve with detection results even if annotation fails
                             resolve(normalizedResult);
+                        })
+                        .finally(() => {
+                            // 4. CLEANUP (Only now do we delete the image)
+                            if (tempImageFile && fs.existsSync(inputPath)) {
+                                fs.unlinkSync(inputPath);
+                            }
                         });
                 } else {
+                    // If not annotating, we can delete immediately
+                    if (tempImageFile && fs.existsSync(inputPath)) {
+                        fs.unlinkSync(inputPath);
+                    }
                     resolve(normalizedResult);
                 }
             } catch (err) {
-                // Clean up temp JSON file on error
-                if (fs.existsSync(jsonOutputPath)) {
-                    fs.unlinkSync(jsonOutputPath);
-                }
+                if (fs.existsSync(jsonOutputPath)) fs.unlinkSync(jsonOutputPath);
+                if (tempImageFile && fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
                 reject(new Error(`Failed to parse model output: ${err.message}`));
             }
         });
 
-        // Handle process errors
         python.on('error', (err) => {
-            if (tempImageFile && fs.existsSync(inputPath)) {
-                fs.unlinkSync(inputPath);
-            }
-            if (fs.existsSync(jsonOutputPath)) {
-                fs.unlinkSync(jsonOutputPath);
-            }
+            if (tempImageFile && fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+            if (fs.existsSync(jsonOutputPath)) fs.unlinkSync(jsonOutputPath);
             reject(new Error(`Failed to start Python process: ${err.message}`));
         });
     });
@@ -165,10 +154,7 @@ async function saveAnnotatedImage(image) {
             fs.writeFileSync(inputPath, image);
             tempImageFile = true;
         } else if (typeof image === 'string') {
-            // If string, assume it's a file path
             inputPath = image;
-
-            // Check if file exists
             if (!fs.existsSync(inputPath)) {
                 return reject(new Error(`Image file not found: ${inputPath}`));
             }
@@ -178,13 +164,11 @@ async function saveAnnotatedImage(image) {
 
         console.log(`Creating annotated image for: ${inputPath}`);
 
-        // Get absolute path for image
         const absoluteImagePath = path.resolve(inputPath);
-
-        // Spawn Python process with --save flag
-        const modelDir = path.join(__dirname, '..', 'model');
-        const python = spawn('python3', [
-            'use_model.py',
+        const modelDir = path.join(__dirname, '..', '..', 'model');
+        
+        const python = spawn(PYTHON_EXECUTABLE, [ // <--- CHANGED: Uses env variable
+            SCRIPT_NAME,
             absoluteImagePath,
             '--save'
         ], {
@@ -193,14 +177,11 @@ async function saveAnnotatedImage(image) {
 
         let errorData = '';
 
-        // Collect stderr data
         python.stderr.on('data', (data) => {
             errorData += data.toString();
         });
 
-        // Handle process completion
         python.on('close', (code) => {
-            // Clean up temp image file if created
             if (tempImageFile && fs.existsSync(inputPath)) {
                 fs.unlinkSync(inputPath);
             }
@@ -232,20 +213,19 @@ async function saveAnnotatedImage(image) {
                 }
 
                 const imageName = path.basename(absoluteImagePath);
-                const annotatedImagePath = path.join(folders[0].path, imageName);
-
+                // YOLO sometimes saves as .jpg even if input is .png, check both
+                let annotatedImagePath = path.join(folders[0].path, imageName);
+                
                 if (!fs.existsSync(annotatedImagePath)) {
-                    return reject(new Error(`Annotated image not found: ${annotatedImagePath}`));
+                     return reject(new Error(`Annotated image not found: ${annotatedImagePath}`));
                 }
 
-                console.log(`Annotated image saved to: ${annotatedImagePath}`);
                 resolve(annotatedImagePath);
             } catch (err) {
                 reject(new Error(`Failed to find annotated image: ${err.message}`));
             }
         });
 
-        // Handle process errors
         python.on('error', (err) => {
             if (tempImageFile && fs.existsSync(inputPath)) {
                 fs.unlinkSync(inputPath);
@@ -255,11 +235,6 @@ async function saveAnnotatedImage(image) {
     });
 }
 
-/**
- * Pretty print detection results
- *
- * @param {Object} result - Detection result from detectTiles()
- */
 function printResults(result) {
     console.log('\n' + '='.repeat(60));
     console.log('DETECTED TILES');
@@ -268,7 +243,6 @@ function printResults(result) {
     console.log(`Tiles detected: ${result.num_tiles_detected}\n`);
 
     if (result.tiles && result.tiles.length > 0) {
-        // Count tiles by type
         const tileCounts = {};
         result.tiles.forEach(tile => {
             tileCounts[tile.tile] = (tileCounts[tile.tile] || 0) + 1;
@@ -292,25 +266,20 @@ function printResults(result) {
     } else {
         console.log('No tiles detected in image.');
     }
-
     console.log('\n' + '='.repeat(60));
 }
 
-// Export functions
 module.exports = {
     detectTiles,
     saveAnnotatedImage,
     printResults
 };
 
-// CLI usage: node detect.js <image_path> [--annotate] [--json]
+// CLI usage
 if (require.main === module) {
     const args = process.argv.slice(2);
-
     if (args.length === 0) {
         console.error('Usage: node detect.js <image_path> [--annotate] [--json]');
-        console.error('  --annotate: Create annotated image with bounding boxes');
-        console.error('  --json: Save detection results to JSON file');
         process.exit(1);
     }
 
@@ -320,14 +289,9 @@ if (require.main === module) {
     detectTiles(imagePath, { annotate: shouldAnnotate })
         .then(result => {
             printResults(result);
-
-            // Show annotated image path if created
             if (result.annotatedImagePath) {
                 console.log(`\n✓ Annotated image saved to: ${result.annotatedImagePath}`);
-                console.log('  (You can delete this file after verification)');
             }
-
-            // Optionally save to JSON file
             if (args.includes('--json')) {
                 const outputPath = imagePath.replace(/\.[^.]+$/, '_detections.json');
                 fs.writeFileSync(outputPath, JSON.stringify(result, null, 2));
