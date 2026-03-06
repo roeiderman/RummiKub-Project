@@ -17,6 +17,7 @@ const connectDatabase = require('./config/database');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const detectionRoutes = require('./routes/detection');
+const optimizeRoutes = require('./routes/optimize');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -49,6 +50,8 @@ app.use(express.static('public'));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/detection', detectionRoutes);
+app.use('/api/optimize', optimizeRoutes);
+
 
 // Root endpoint
 app.get('/', (req, res) => {

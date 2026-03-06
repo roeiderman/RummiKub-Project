@@ -44,7 +44,7 @@ async function detectTiles(image, options = {}) {
 
         const jsonOutputPath = path.join(__dirname, 'temp_detections.json');
         const absoluteImagePath = path.resolve(inputPath);
-        const modelDir = path.join(__dirname, '..', 'model');
+        const modelDir = path.join(__dirname, '..', '..', 'model');
         
         // 2. RUN PYTHON DETECTION
         const python = spawn(PYTHON_EXECUTABLE, [
@@ -82,13 +82,19 @@ async function detectTiles(image, options = {}) {
 
                 console.log(`Detected ${result.tiles.length} tiles`);
 
+                // Normalize tile colors (Yellow -> Orange for Rummikub standard colors)
+                const normalizedTiles = result.tiles.map(tile => ({
+                    ...tile,
+                    color: tile.color === 'Yellow' ? 'Orange' : tile.color
+                }));
+
                 const normalizedResult = {
                     success: true,
                     image: result.image,
                     image_width: result.image_width,
                     image_height: result.image_height,
-                    num_tiles_detected: result.tiles.length,
-                    tiles: result.tiles
+                    num_tiles_detected: normalizedTiles.length,
+                    tiles: normalizedTiles
                 };
 
                 // 3. RUN ANNOTATION (If requested)
@@ -159,7 +165,7 @@ async function saveAnnotatedImage(image) {
         console.log(`Creating annotated image for: ${inputPath}`);
 
         const absoluteImagePath = path.resolve(inputPath);
-        const modelDir = path.join(__dirname, '..', 'model');
+        const modelDir = path.join(__dirname, '..', '..', 'model');
         
         const python = spawn(PYTHON_EXECUTABLE, [ // <--- CHANGED: Uses env variable
             SCRIPT_NAME,
