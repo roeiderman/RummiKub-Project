@@ -5,7 +5,7 @@
 const authService = require('../services/auth');
 
 /**
- * Register new user
+ * Register new user.
  * POST /api/auth/register
  */
 const register = async (req, res, next) => {
@@ -23,7 +23,7 @@ const register = async (req, res, next) => {
 };
 
 /**
- * Login user
+ * Login user.
  * POST /api/auth/login
  */
 const login = async (req, res, next) => {
@@ -50,7 +50,7 @@ const login = async (req, res, next) => {
 };
 
 /**
- * Logout user
+ * Logout user.
  * POST /api/auth/logout
  */
 const logout = async (req, res, next) => {
@@ -67,7 +67,7 @@ const logout = async (req, res, next) => {
 };
 
 /**
- * Refresh access token
+ * Refresh access token .
  * POST /api/auth/refresh
  */
 const refresh = async (req, res, next) => {
