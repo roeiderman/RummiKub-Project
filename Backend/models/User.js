@@ -1,5 +1,5 @@
 /**
- * User Model - MongoDB Schema
+ *User Model - MongoDB Schema
  */
 
 const mongoose = require('mongoose');
@@ -61,12 +61,12 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function() {
-    // 1. If password isn't changed, just stop here (Mongoose continues automatically)
+    //1. If password isn't changed, just stop here (Mongoose continues automatically)
     if (!this.isModified('password')) {
         return; 
     }
 
-    // 2. Hash the password
+    //2. Hash the password
     try {
         const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);

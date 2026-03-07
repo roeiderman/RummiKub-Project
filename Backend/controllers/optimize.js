@@ -8,7 +8,7 @@ const optimize = async (req, res, next) => {
     try {
         const { groups, rack } = req.body;
 
-        // Validate required fields
+        // Validate required fields.
         if (!groups || !rack) {
             const error = new Error('Groups and rack are required');
             error.statusCode = 400;
@@ -16,7 +16,7 @@ const optimize = async (req, res, next) => {
             throw error;
         }
 
-        // Validate types
+        // Validate types.
         if (!Array.isArray(groups) || !Array.isArray(rack)) {
             const error = new Error('Groups and rack must be arrays');
             error.statusCode = 400;
@@ -24,7 +24,7 @@ const optimize = async (req, res, next) => {
             throw error;
         }
 
-        // Validate groups structure
+        // Validate groups structure.
         if (!groups.every(g => Array.isArray(g))) {
             const error = new Error('Each group must be an array of tiles');
             error.statusCode = 400;
@@ -32,10 +32,10 @@ const optimize = async (req, res, next) => {
             throw error;
         }
 
-        // Call service to find optimal move
+        // Call service to find optimal move.
         const result = await optimizeService.findOptimalMove(groups, rack);
 
-        // Success response
+        // Success response.
         res.status(200).json({
             success: true,
             data: result,
@@ -44,7 +44,7 @@ const optimize = async (req, res, next) => {
                 : 'No valid move found'
         });
     } catch (error) {
-        // Handle board validation errors
+        // Handle board validation errors.
         if (error.type === 'BoardInvalidError') {
             return res.status(error.statusCode || 400).json({
                 success: false,
@@ -56,7 +56,7 @@ const optimize = async (req, res, next) => {
             });
         }
 
-        // Handle validation errors
+        // Handle validation errors.
         if (error.type === 'ValidationError') {
             return res.status(error.statusCode || 400).json({
                 success: false,
@@ -67,7 +67,7 @@ const optimize = async (req, res, next) => {
             });
         }
 
-        // Pass other errors to error handler middleware
+        // Pass other errors to error handler middleware.
         next(error);
     }
 };
