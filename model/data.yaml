@@ -1,7 +1,7 @@
 # Rummikub Tile Detection Dataset Configuration
 # IMPORTANT: Update the 'path' below to the absolute path of your dataset directory
 
-path: /Users/roeyderman/projects/RummiKub-Project/RummiKub-Project/dataset
+path: /Users/roeyderman/projects/RummiKub-Project/RummiKub-Project/model/dataset
 train: images/train
 val: images/val
 test: images/test

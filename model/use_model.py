@@ -20,7 +20,7 @@ def detect_tiles(image_path, show=False, save=False, json_output=None):
 
     # Load trained model
     print("Loading model...")
-    model = YOLO('models/rummikub_best.pt')
+    model = YOLO('models/rummikub_best_v1.pt')
 
     # Get absolute path for predict folder in project root
     project_root = Path(__file__).parent
