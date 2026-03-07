@@ -3,35 +3,6 @@
  */
 
 const { detectTiles } = require('../utils/detect');
-const gameLogic = require('../utils/gameLogic');
-const path = require('path');
-const fs = require('fs');
-
-/**
- * Perform tile detection on uploaded image
- * No database storage - just returns results
- */
-const performDetection = async (imageBuffer, options = {}) => {
-    const { annotate = false } = options;
-
-    try {
-        // Call existing detect.js module with Buffer
-        const result = await detectTiles(imageBuffer, { annotate });
-
-        // Return detection results
-        return {
-            success: true,
-            imageWidth: result.image_width,
-            imageHeight: result.image_height,
-            numTilesDetected: result.num_tiles_detected,
-            tiles: result.tiles,
-            ...(result.annotatedImagePath && { annotatedImagePath: result.annotatedImagePath })
-        };
-    } catch (error) {
-        console.error('Detection error:', error);
-        throw error;
-    }
-};
 
 /**
  * Perform tile detection WITH series analysis
@@ -39,7 +10,7 @@ const performDetection = async (imageBuffer, options = {}) => {
  * @param {Object} options - Detection options
  * @returns {Object} Detection results with series information
  */
-const performDetectionWithGroups = async (imageBuffer, options = {}) => {
+const performDetection = async (imageBuffer, options = {}) => {
     const { annotate = false, groupFlag = false} = options;
 
     try {
@@ -58,19 +29,17 @@ const performDetectionWithGroups = async (imageBuffer, options = {}) => {
                 numTilesDetected: result.num_tiles_detected,
                 groups: groups,
                 numSeriesDetected: groups.length,
-                numValidSeries: groups.filter(s => s.isValid).length,
-                numInvalidSeries: groups.filter(s => !s.isValid).length,
                 ...(result.annotatedImagePath && { annotatedImagePath: result.annotatedImagePath })
             };
         }
 
-        // 3. Return basic detection if no series analysis
+        // 3. Return basic detection if no group analysis
         return {
             success: true,
             imageWidth: result.image_width,
             imageHeight: result.image_height,
             numTilesDetected: result.num_tiles_detected,
-            tiles: result.tiles,
+            rack: result.tiles,
             ...(result.annotatedImagePath && { annotatedImagePath: result.annotatedImagePath })
         };
     } catch (error) {
@@ -78,11 +47,6 @@ const performDetectionWithGroups = async (imageBuffer, options = {}) => {
         throw error;
     }
 };
-
-/**
- * Rummikub Game Logic Utility
- * Handles series detection and validation for Rummikub tiles
- */
 
 /**
  * Groups tiles based on physical proximity and visual alignment (rotation invariant).
@@ -204,8 +168,6 @@ function groupTiles(tiles) {
 }
 
 
-
 module.exports = {
-    performDetection,
-    performDetectionWithGroups
+    performDetection
 };

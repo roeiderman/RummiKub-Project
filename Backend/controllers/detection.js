@@ -21,14 +21,9 @@ const detectTiles = async (req, res, next) => {
         // Get options from request body
         const annotate = req.body.annotate === 'true' || req.body.annotate === true;
         const groupFlag = req.body.groupFlag === 'true' || req.body.groupFlag === true;
-        /**
-         * @param {number} [threshold] - Optional proximity threshold (px)
-         *   - If not provided: auto-calculated based on tile density
-         *   - If provided: used as exact value (expert override)
-         *   - Typical values: 60-120px depending on layout density
-         */
+
         // Perform detection (with or without series analysis)
-        const result = await detectionService.performDetectionWithGroups(req.file.buffer, { annotate, groupFlag });
+        const result = await detectionService.performDetection(req.file.buffer, { annotate, groupFlag });
 
         const message = groupFlag
             ? `Detected ${result.numTilesDetected} tiles and ${result.numSeriesDetected} series`
