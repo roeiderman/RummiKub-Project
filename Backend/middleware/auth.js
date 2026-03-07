@@ -8,7 +8,7 @@ const User = require('../models/User');
 const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
- * Require authentication - protect routes
+ * Require authentication - protect routes.
  */
 const requireAuth = async (req, res, next) => {
     try {

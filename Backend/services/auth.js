@@ -7,7 +7,7 @@ const { generateAccessToken, generateRefreshToken, verifyToken } = require('../u
 const { validatePasswordStrength } = require('../utils/passwordUtils');
 
 /**
- * Register new user
+ * Register new user to the system and receive access and refresh tokens
  */
 const register = async (userData) => {
     const { name, email, password, gender, dateOfBirth, photo } = userData;
@@ -56,7 +56,7 @@ const register = async (userData) => {
 };
 
 /**
- * Login user
+ * Login user to the system
  */
 const login = async (email, password) => {
     // Find user and include password
@@ -106,7 +106,7 @@ const logout = async (userId) => {
 };
 
 /**
- * Refresh access token
+ * Refresh access token, to receive a new access token using a valid refresh token
  */
 const refreshAccessToken = async (refreshToken) => {
     try {
