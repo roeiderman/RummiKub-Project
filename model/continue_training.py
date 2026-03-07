@@ -50,6 +50,7 @@ def continue_training(
         imgsz=640,
         batch=batch,
         device=device,
+        amp=False,
         project='runs/continue_train',
         name='rummikub_continued',
         patience=25,
@@ -60,14 +61,17 @@ def continue_training(
         lr0=lr0,
         lrf=lr0/10,
 
-        # Augmentation
-        hsv_h=0.02,
-        hsv_s=0.7,
-        hsv_v=0.5,
-        degrees=45.0,
-        flipud=0.3,
-        fliplr=0.5,
-        mosaic=0.9,
+        # Augmentation (minimal to avoid OBB transformation issues)
+        hsv_h=0.015,
+        hsv_s=0.4,
+        hsv_v=0.3,
+        degrees=0.0,
+        translate=0.0,
+        scale=0.0,
+        flipud=0.0,
+        fliplr=0.0,
+        mosaic=0.0,
+        mixup=0.0,
 
         verbose=True,
         save_period=10

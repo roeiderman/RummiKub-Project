@@ -21,6 +21,8 @@ rad.json
 #Test results file
 TestResults.xml
 
+model/temp_images
+
 ### Python / YOLO Training ###
 # Python cache
 __pycache__/
