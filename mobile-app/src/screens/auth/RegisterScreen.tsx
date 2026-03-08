@@ -49,6 +49,8 @@ export default function RegisterScreen() {
         'Your account has been created. Please sign in.',
         [{ text: 'OK', onPress: () => router.back() }]
       );
+
+      router.replace('/');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       Alert.alert('Registration Failed', errorMessage);
