@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '@/src/constants/config';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 
 type LoginPayload = {
   email: string;
