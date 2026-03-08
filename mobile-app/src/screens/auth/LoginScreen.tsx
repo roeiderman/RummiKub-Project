@@ -1,0 +1,161 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter  } from 'expo-router';
+import { COLORS } from '@/src/constants/colors';
+import { loginUser } from '@/src/services/authService';
+
+export default function LoginScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  
+  const router = useRouter();
+
+  const handleSignIn = async () => {
+    try {
+      const result = await loginUser({ email, password });
+      console.log('Login success:', result);
+      router.replace('/home');
+    } catch (error) {
+      console.log('Login error:', error);
+    }
+};
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.logo}>🎲</Text>
+        <Text style={styles.title}>Rummikub AI{'\n'}Assistant</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Sign-In</Text>
+
+        <Text style={styles.label}>Sign in with email</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="email"
+          placeholderTextColor="#6f6a95"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#6f6a95"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+
+        <View style={styles.actionsRow}>
+          <TouchableOpacity onPress={() => router.push('/register')}>
+            <Text style={styles.linkText}>Create Account</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.signInButton} onPress={handleSignIn}>
+            <Text style={styles.signInButtonText}>Sign In</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.footerText}>
+          By signing up you agree to the{' '}
+          <Text style={styles.linkText}>Terms of Service</Text> and{' '}
+          <Text style={styles.linkText}>Privacy Policy</Text>
+        </Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 22,
+    paddingTop: 24,
+  },
+  header: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  logo: {
+    fontSize: 28,
+    marginBottom: 8,
+  },
+  title: {
+    color: COLORS.text,
+    fontSize: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 36,
+  },
+  card: {
+    backgroundColor: COLORS.card,
+    borderRadius: 28,
+    paddingHorizontal: 20,
+    paddingVertical: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    minHeight: 520,
+  },
+  cardTitle: {
+    color: COLORS.text,
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 36,
+  },
+  label: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 18,
+  },
+  input: {
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.inputBorder,
+    color: COLORS.text,
+    fontSize: 16,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 18,
+  },
+  linkText: {
+    color: COLORS.link,
+    fontSize: 14,
+  },
+  signInButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 14,
+  },
+  signInButtonText: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  footerText: {
+    color: COLORS.mutedText,
+    fontSize: 13,
+    marginTop: 28,
+    lineHeight: 20,
+  },
+});
