@@ -5,11 +5,12 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { COLORS } from '@/src/constants/colors';
-import { registerUser } from '@/src/services/authService';
+import { COLORS } from '../../constants/colors';
+import { registerUser } from '../../services/authService';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
@@ -17,11 +18,40 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
 
   const handleRegister = async () => {
+    // Client-side validation for instant feedback
+    if (!name || name.trim().length < 2) {
+      Alert.alert('Validation Error', 'Name must be at least 2 characters');
+      return;
+    }
+
+    if (!email) {
+      Alert.alert('Validation Error', 'Email is required');
+      return;
+    }
+
+    // Simple email format validation
+    const isValidEmail = (email: string) => /^\S+@\S+\.\S+$/.test(email);
+    if (!isValidEmail(email)) {
+      Alert.alert('Validation Error', 'Please enter a valid email address');
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      Alert.alert('Validation Error', 'Password must be at least 6 characters');
+      return;
+    }
+
     try {
       const result = await registerUser({ name, email, password });
       console.log('Register success:', result);
+      Alert.alert(
+        'Registration Successful',
+        'Your account has been created. Please sign in.',
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
     } catch (error) {
-      console.log('Register error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      Alert.alert('Registration Failed', errorMessage);
     }
   };
 

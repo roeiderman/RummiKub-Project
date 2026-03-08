@@ -5,11 +5,12 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter  } from 'expo-router';
-import { COLORS } from '@/src/constants/colors';
-import { loginUser } from '@/src/services/authService';
+import { COLORS } from '../../constants/colors';
+import { loginUser } from '../../services/authService';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -18,12 +19,26 @@ export default function LoginScreen() {
   const router = useRouter();
 
   const handleSignIn = async () => {
+    // Client-side validation for instant feedback
+    if (!email || !password) {
+      Alert.alert('Validation Error', 'Email and password are required');
+      return;
+    }
+
+    // Simple email format validation
+    const isValidEmail = (email: string) => /^\S+@\S+\.\S+$/.test(email);
+    if (!isValidEmail(email)) {
+      Alert.alert('Validation Error', 'Please enter a valid email address');
+      return;
+    }
+
     try {
       const result = await loginUser({ email, password });
       console.log('Login success:', result);
       router.replace('/home');
     } catch (error) {
-      console.log('Login error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      Alert.alert('Login Failed', errorMessage);
     }
 };
 
