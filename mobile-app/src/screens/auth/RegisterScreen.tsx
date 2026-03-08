@@ -20,6 +20,7 @@ export default function RegisterScreen() {
     try {
       const result = await registerUser({ name, email, password });
       console.log('Register success:', result);
+      router.replace('/');
     } catch (error) {
       console.log('Register error:', error);
     }
