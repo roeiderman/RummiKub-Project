@@ -23,7 +23,7 @@ export async function loginUser(payload: LoginPayload) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.message || 'Login failed');
+    throw new Error(data.error?.message || data.message || 'Login failed');
   }
 
   return data;
@@ -41,7 +41,7 @@ export async function registerUser(payload: RegisterPayload) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.message || 'Registration failed');
+    throw new Error(data.error?.message || data.message || 'Registration failed');
   }
 
   return data;
