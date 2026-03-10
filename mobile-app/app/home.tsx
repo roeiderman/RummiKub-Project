@@ -1,52 +1,170 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
+import { StyleSheet, View, Text, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+// Ionicons comes pre-installed with Expo!
+import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
+import { uploadImageForDetection } from '../src/services/detectionService';
 
-export default function HomePage() {
+export default function HomeScreen() {
   const router = useRouter();
+  const [rackImage, setRackImage] = useState<string | null>(null);
+  const [boardImage, setBoardImage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // 1. The Pop-up Menu
+  const showImageOptions = (type: 'rack' | 'board') => {
+    Alert.alert(
+      `Upload ${type === 'rack' ? 'Rack' : 'Board'}`,
+      'Where would you like to get the image from?',
+      [
+        { text: 'Take Photo', onPress: () => processImageSelection(type, 'camera') },
+        { text: 'Choose from Gallery', onPress: () => processImageSelection(type, 'gallery') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  // 2. The actual Camera/Gallery logic
+  const processImageSelection = async (type: 'rack' | 'board', source: 'camera' | 'gallery') => {
+    let result;
+
+    if (source === 'camera') {
+      // Handle Camera
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'We need camera access to take a photo.');
+        return;
+      }
+
+      result = await ImagePicker.launchCameraAsync({
+      quality: 0.8,
+      allowsEditing: true, // Forces the user to crop the photo
+      aspect: [1, 1],      // Forces a perfect square!
+      });
+
+    } else {
+      // Handle Gallery
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'We need gallery access to pick a photo.');
+        return;
+      }
+      
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Only allow images, no videos
+        quality: 0.8,
+      });
+    }
+
+    // Save the image URI to the correct state variable
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      if (type === 'rack') setRackImage(result.assets[0].uri);
+      else setBoardImage(result.assets[0].uri);
+    }
+  };
+
+  // Function to handle the Continue button
+  const handleContinue = async () => {
+    if (!rackImage || !boardImage) return;
+
+    setIsLoading(true);
+    try {
+      // 1. PULL THE TOKEN FROM THE VAULT
+      const accessToken = await SecureStore.getItemAsync('accessToken');
+      
+      if (!accessToken) {
+        Alert.alert('Authentication Error', 'You must be logged in to analyze tiles.');
+        // TODO: Optionally redirect them back to the Login screen here
+        return;
+      }
+      
+      // Send the Rack (groupFlag = false)
+      console.log("Analyzing Rack...");
+      const rackData = await uploadImageForDetection(rackImage, false, accessToken);
+
+      // Send the Board (groupFlag = true)
+      console.log("Analyzing Board...");
+      const boardData = await uploadImageForDetection(boardImage, true, accessToken);
+      
+      // 3. Navigate to the Correction screen with BOTH sets of results
+      // 4. USE ROUTER.PUSH AND STRINGIFY THE DATA
+      router.push({
+        pathname: '/edit', // Ensure you have a file at app/correction.tsx
+        params: { 
+          rackTiles: JSON.stringify(rackData),
+          boardGroups: JSON.stringify(boardData)
+        }
+      });
+
+    } catch (error: any) {
+      Alert.alert('Analysis Failed', error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const isReady = rackImage && boardImage;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Home</Text>
-      <Text style={styles.subtitle}>Logged in successfully</Text>
+      <Text style={styles.title}>Start Your Move</Text>
+      
+      <View style={styles.uploadContainer}>
+        {/* Rack Upload Slot */}
+        <TouchableOpacity style={styles.card} onPress={() => showImageOptions('rack')}>
+          {rackImage ? (
+            <Image source={{ uri: rackImage }} style={styles.preview} />
+          ) : (
+            <View style={styles.placeholder}>
+              <Ionicons name="person-outline" size={40} color="#666" />
+              <Text style={styles.cardText}>Upload Rack</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => router.replace('/')}
+        {/* Board Upload Slot */}
+        <TouchableOpacity style={styles.card} onPress={() => showImageOptions('board')}>
+          {boardImage ? (
+            <Image source={{ uri: boardImage }} style={styles.preview} />
+          ) : (
+            <View style={styles.placeholder}>
+              <Ionicons name="grid-outline" size={40} color="#666" />
+              <Text style={styles.cardText}>Upload Board</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Continue Button */}
+      <TouchableOpacity 
+        style={[styles.continueButton, !isReady && styles.disabledButton]}
+        disabled={!isReady || isLoading}
+        onPress={handleContinue}
       >
-        <Text style={styles.buttonText}>Back to Login</Text>
+        {isLoading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Continue to Analyze</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5', justifyContent: 'center' },
+  title: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 40, color: '#333' },
+  uploadContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40 },
+  card: { 
+    width: '48%', height: 180, backgroundColor: '#fff', borderRadius: 15, 
+    borderWidth: 1, borderColor: '#ddd', overflow: 'hidden', elevation: 3
   },
-
-  title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-
-  subtitle: {
-    fontSize: 18,
-    marginBottom: 30,
-  },
-
-  button: {
-    backgroundColor: '#5c6cff',
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  placeholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  cardText: { marginTop: 10, color: '#666', fontWeight: '500' },
+  preview: { width: '100%', height: '100%' },
+  continueButton: { backgroundColor: '#007AFF', padding: 18, borderRadius: 12, alignItems: 'center' },
+  disabledButton: { backgroundColor: '#ccc' },
+  buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' }
 });

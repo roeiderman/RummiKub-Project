@@ -30,6 +30,7 @@ def detect_tiles(image_path, show=False, save=False, json_output=None):
     print(f"Detecting tiles in: {image_path}")
     results = model.predict(
         source=image_path,
+        imgsz=1280,
         conf=0.5,           # Raised from 0.25 to filter low-confidence false positives
         iou=0.45,           # More aggressive NMS for overlapping boxes
         agnostic_nms=True,  # Suppress overlaps regardless of class
