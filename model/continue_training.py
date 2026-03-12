@@ -1,124 +1,127 @@
 #!/usr/bin/env python3
 """
-Continue training module for existing Rummikub detection model.
-
-Usage:
-    python continue_training.py
-    python continue_training.py --epochs 100
-    python continue_training.py --model models/rummikub_best.pt --lr 0.0001
+Continued training for Rummikub OBB detection.
+Fixes: 
+- Matmul/Overflow errors via augmentation stabilization.
+- MPS stability via SGD and lower LR.
+- Automatic cache clearing.
 """
 
 from ultralytics import YOLO
 import argparse
 import shutil
+import os
 from pathlib import Path
 
+def clear_dataset_cache(data_yaml):
+    """Deletes .cache files to prevent corrupted labels from persisting."""
+    paths = [
+        'dataset/labels/train.cache',
+        'dataset/labels/val.cache'
+    ]
+    for p in paths:
+        cache_file = Path(p)
+        if cache_file.exists():
+            print(f"Removing old cache: {p}")
+            os.remove(cache_file)
 
 def continue_training(
     base_model='models/rummikub_best.pt',
     data_yaml='data.yaml',
     epochs=50,
-    lr0=0.0001,
-    batch=16,
+    lr0=0.00005,  # Lowered for stability
+    batch=4,      # Reduced to 4 for maximum stability (was 8)
     device='mps'
 ):
-    """
-    Continue training an existing model.
+    print(f"\n🚀 Initializing Continued Training")
+    print(f"Model: {base_model} | Device: {device} | Batch: {batch}\n")
 
-    Args:
-        base_model: Path to existing trained model (.pt file)
-        data_yaml: Path to dataset configuration file
-        epochs: Number of training epochs
-        lr0: Initial learning rate
-        batch: Batch size
-        device: Training device ('mps', 'cuda', 'cpu')
+    # 1. Clean up old caches
+    clear_dataset_cache(data_yaml)
 
-    Returns:
-        str: Path to saved model
-    """
-    print(f"\nContinue Training")
-    print(f"Base Model: {base_model}")
-    print(f"Epochs: {epochs}, LR: {lr0}, Batch: {batch}\n")
-
-    # Load existing model
+    # 2. Load model
     model = YOLO(base_model)
 
-    # Continue training
+    # 3. Train with stability-focused parameters
     model.train(
         data=data_yaml,
         epochs=epochs,
         imgsz=640,
         batch=batch,
         device=device,
-        amp=False,
+        amp=False,          # Disable AMP (Mixed Precision) to avoid NaNs on MPS
         project='runs/continue_train',
         name='rummikub_continued',
-        patience=25,
+        patience=30,
         resume=False,
 
-        # Optimizer settings
-        optimizer='AdamW',
+        # Optimization settings
+        optimizer='SGD',    # More stable for OBB when weights are diverging
         lr0=lr0,
-        lrf=lr0/10,
+        lrf=0.01,
+        momentum=0.937,
+        weight_decay=0.0005,
 
-        # Augmentation (minimal to avoid OBB transformation issues)
+        # ALL Augmentation DISABLED for OBB stability
+        degrees=0.0,        # No rotation
+        translate=0.0,      # No translation
+        scale=0.0,          # No scaling
+        shear=0.0,          # No shear
+        perspective=0.0,    # No perspective
+        flipud=0.0,         # No vertical flip
+        fliplr=0.0,         # No horizontal flip (was causing matmul errors)
+        mosaic=0.0,         # No mosaic
+        mixup=0.0,          # No mixup
+        copy_paste=0.0,     # No copy-paste augmentation
+        auto_augment=None,  # CRITICAL: Disable RandAugment/AutoAugment
+        erasing=0.0,        # CRITICAL: Disable random erasing
+
+        # Color augmentation only (safe for OBB)
         hsv_h=0.015,
-        hsv_s=0.4,
-        hsv_v=0.3,
-        degrees=0.0,
-        translate=0.0,
-        scale=0.0,
-        flipud=0.0,
-        fliplr=0.0,
-        mosaic=0.0,
-        mixup=0.0,
+        hsv_s=0.7,
+        hsv_v=0.4,
 
+        # Training behavior
+        rect=False,         # Disable rectangular training
+        close_mosaic=0,     # Ensure mosaic stays off
+
+        # Misc
+        workers=0,          # Set to 0 on Mac to avoid multiprocessing overhead/crashes
         verbose=True,
-        save_period=10
+        save_period=5
     )
 
-    # Save model to models directory
+    # 4. Save and version the resulting model
     best_path = Path('runs/continue_train/rummikub_continued/weights/best.pt')
     if best_path.exists():
         models_dir = Path('models')
         models_dir.mkdir(exist_ok=True)
 
-        # Find next version
         version = 1
         while (models_dir / f"rummikub_continued_v{version}.pt").exists():
             version += 1
 
         output_path = models_dir / f"rummikub_continued_v{version}.pt"
         shutil.copy2(best_path, output_path)
-
-        print(f"\n✓ Model saved: {output_path}")
+        print(f"\n✅ Success! Model saved to: {output_path}")
         return str(output_path)
 
     return None
 
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Continue training existing model')
-    parser.add_argument('--model', default='models/rummikub_best.pt', help='Base model path')
-    parser.add_argument('--data', default='data.yaml', help='Dataset config')
-    parser.add_argument('--epochs', type=int, default=50, help='Training epochs')
-    parser.add_argument('--lr', type=float, default=0.0001, help='Learning rate')
-    parser.add_argument('--batch', type=int, default=16, help='Batch size')
-    parser.add_argument('--device', default='mps', help='Device: mps, cuda, cpu')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', default='models/rummikub_best_v1.pt')
+    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--lr', type=float, default=0.00005)
+    parser.add_argument('--batch', type=int, default=4)
+    parser.add_argument('--device', default='mps')
 
     args = parser.parse_args()
 
     result = continue_training(
         base_model=args.model,
-        data_yaml=args.data,
         epochs=args.epochs,
         lr0=args.lr,
         batch=args.batch,
         device=args.device
     )
-
-    if result:
-        print(f"✓ Training complete: {result}")
-    else:
-        print("❌ Training failed")
-        exit(1)
