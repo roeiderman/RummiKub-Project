@@ -48,7 +48,6 @@ export const uploadImageForDetection = async (imageUri: string, groupFlag: boole
     if (!response.ok) {
       throw new Error(data.message || 'Failed to analyze image');
     }
-    console.log(data);
 
     return data;
 

@@ -81,11 +81,9 @@ export default function HomeScreen() {
       }
       
       // Send the Rack (groupFlag = false)
-      console.log("Analyzing Rack...");
       const rackData = await uploadImageForDetection(rackImage, false, accessToken);
 
       // Send the Board (groupFlag = true)
-      console.log("Analyzing Board...");
       const boardData = await uploadImageForDetection(boardImage, true, accessToken);
       
       // 3. Navigate to the Correction screen with BOTH sets of results
