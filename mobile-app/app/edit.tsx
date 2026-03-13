@@ -199,7 +199,6 @@ export default function EditChooserScreen() {
               <Text style={styles.requiredText}>!</Text>
             </View>
           )}
-          <Text style={styles.buttonEmoji}>🎯</Text>
           <Text style={styles.buttonText}>Edit Board</Text>
           <Text style={styles.buttonSubtext}>
             {visitedBoard ? 'Reviewed ✓' : 'Required - Tap to review'}
@@ -257,7 +256,6 @@ export default function EditChooserScreen() {
             </>
           ) : (
             <>
-              <Text style={styles.findMoveEmoji}>🧠</Text>
               <Text style={styles.findMoveText}>Find Your Best Move</Text>
             </>
           )}
