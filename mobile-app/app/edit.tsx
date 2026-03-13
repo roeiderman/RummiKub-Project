@@ -94,7 +94,7 @@ export default function EditChooserScreen() {
           .join(', ');
 
         Alert.alert(
-          '🎯 Optimal Move Found!',
+          'Optimal Move Found!',
           `${moveDescription}\n\nTiles to play: ${tilesUsedText}\n\nTiles played: ${tilesPlayed}`,
           [
             {
@@ -130,7 +130,7 @@ export default function EditChooserScreen() {
         errorSummary += 'Each group needs:\n• At least 3 tiles\n• Valid run (same color, consecutive numbers)\n  OR valid set (same number, different colors)';
 
         Alert.alert(
-          '⚠️ Invalid Board Configuration',
+          'Invalid Board Configuration',
           errorSummary,
           [
             {
@@ -153,7 +153,7 @@ export default function EditChooserScreen() {
       } else {
         // General error
         Alert.alert(
-          '❌ Optimization Error',
+          'Optimization Error',
           error.message || 'Failed to find optimal move. Please try again.',
           [{ text: 'OK' }]
         );
@@ -201,7 +201,7 @@ export default function EditChooserScreen() {
           )}
           <Text style={styles.buttonText}>Edit Board</Text>
           <Text style={styles.buttonSubtext}>
-            {visitedBoard ? 'Reviewed ✓' : 'Required - Tap to review'}
+            {visitedBoard ? 'Reviewed' : 'Required - Tap to review'}
           </Text>
         </TouchableOpacity>
 
@@ -233,10 +233,9 @@ export default function EditChooserScreen() {
               <Text style={styles.requiredText}>!</Text>
             </View>
           )}
-          <Text style={styles.buttonEmoji}>🎴</Text>
           <Text style={styles.buttonText}>Edit Rack</Text>
           <Text style={styles.buttonSubtext}>
-            {visitedRack ? 'Reviewed ✓' : 'Required - Tap to review'}
+            {visitedRack ? 'Reviewed' : 'Required - Tap to review'}
           </Text>
         </TouchableOpacity>
       </View>

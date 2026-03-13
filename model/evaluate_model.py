@@ -109,7 +109,7 @@ def evaluate_model(model_path, data_yaml='data.yaml', split='test', conf=0.25, i
         # Weak classes analysis
         if weak_classes:
             print("\n" + "=" * 60)
-            print(f"⚠️  WEAK CLASSES (< 50% AP) - {len(weak_classes)} classes")
+            print(f"WEAK CLASSES (< 50% AP) - {len(weak_classes)} classes")
             print("=" * 60)
             weak_classes.sort(key=lambda x: x[1])  # Sort by AP (lowest first)
             for class_name, ap in weak_classes:
@@ -141,7 +141,7 @@ def evaluate_model(model_path, data_yaml='data.yaml', split='test', conf=0.25, i
         print("  - Review annotation quality for underperforming classes")
         print("  - Try training for more epochs (current patience may have stopped early)")
     else:
-        print("⚠️  Poor performance. Action required:")
+        print("  Poor performance. Action required:")
         print("  - Review dataset quality and annotations")
         print("  - Check for class imbalance issues")
         print("  - Consider collecting more diverse training examples")
