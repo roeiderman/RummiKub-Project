@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
+import UserMenu from '../components/UserMenu';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -24,6 +25,7 @@ export default function RootLayout() {
         <Stack.Screen name="edit-board" />
         <Stack.Screen name="edit-rack" />
       </Stack>
+      <UserMenu />
       <StatusBar style="light" />
     </>
   );

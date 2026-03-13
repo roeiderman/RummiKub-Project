@@ -88,7 +88,7 @@ export default function EditRackScreen() {
     if (invalidJokers.length > 0) {
       const invalidColors = invalidJokers.map(t => t.color).join(', ');
       Alert.alert(
-        '⚠️ Invalid Joker Color',
+        'Invalid Joker Color',
         `Jokers can only be Red or Black.\n\nYou have joker(s) with invalid color(s): ${invalidColors}\n\nPlease fix the joker colors before going back.`,
         [{ text: 'OK' }]
       );
