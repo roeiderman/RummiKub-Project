@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } fr
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { EDITOR_THEME } from '../src/constants/colors';
 import { findOptimalMove } from '../src/services/optimizeService';
+import { recordTurn } from '../src/services/leaderboardService';
 import { DetectionResponse } from '../src/types/tile';
 
 export default function EditChooserScreen() {
@@ -72,6 +73,7 @@ export default function EditChooserScreen() {
 
       // Show results
       if (result.data.tilesPlayed === 0) {
+        recordTurn(0).catch(() => {});
         Alert.alert(
           'No Move Found',
           'No valid moves available with your current tiles.',
@@ -79,6 +81,9 @@ export default function EditChooserScreen() {
         );
       } else {
         const { optimalMove, tilesPlayed, updatedGroups, remainingRack } = result.data;
+
+        // Record turn in leaderboard
+        recordTurn(tilesPlayed).catch(() => {});
 
         // Format the move description
         let moveDescription = '';
@@ -106,6 +111,10 @@ export default function EditChooserScreen() {
               },
             },
             { text: 'OK' },
+            {
+              text: 'Upload New Images',
+              onPress: () => router.replace('/home'),
+            },
           ]
         );
       }

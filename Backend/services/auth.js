@@ -5,6 +5,7 @@
 const User = require('../models/User');
 const { generateAccessToken, generateRefreshToken, verifyToken } = require('../utils/tokenManager');
 const { validatePasswordStrength } = require('../utils/passwordUtils');
+const leaderboardService = require('./leaderboard');
 
 /**
  * Register new user to the system and receive access and refresh tokens
@@ -47,6 +48,9 @@ const register = async (userData) => {
     // Save refresh token to user
     user.refreshToken = refreshToken;
     await user.save();
+
+    // Create leaderboard entry for new user
+    await leaderboardService.createEntry(user._id, user.email);
 
     return {
         user: user.toJSON(),

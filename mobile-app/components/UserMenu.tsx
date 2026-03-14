@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { logoutUser } from '../src/services/authService';
 import { SessionUser, getSessionUser } from '../src/services/sessionService';
 
-const AUTHENTICATED_ROUTES = new Set(['/home', '/edit', '/edit-board', '/edit-rack']);
+const AUTHENTICATED_ROUTES = new Set(['/home', '/edit', '/edit-board', '/edit-rack', '/leaderboard']);
 
 export default function UserMenu() {
   const pathname = usePathname();
@@ -95,6 +95,15 @@ export default function UserMenu() {
             </View>
 
             <TouchableOpacity
+              style={styles.leaderboardButton}
+              activeOpacity={0.85}
+              onPress={() => { setMenuVisible(false); router.push('/leaderboard'); }}
+            >
+              <Ionicons name="trophy-outline" size={18} color="#5f67ff" />
+              <Text style={styles.leaderboardText}>Leaderboard</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
               activeOpacity={0.85}
               disabled={isLoggingOut}
@@ -175,6 +184,22 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 13,
     color: '#666666',
+  },
+  leaderboardButton: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#5f67ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  leaderboardText: {
+    color: '#5f67ff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   logoutButton: {
     height: 44,

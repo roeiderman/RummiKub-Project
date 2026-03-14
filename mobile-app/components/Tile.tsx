@@ -14,7 +14,8 @@ interface TileProps {
 }
 
 export default function Tile({ tile, isSelected = false, onPress }: TileProps) {
-  const isJoker = tile.number === '0' || tile.number === 'joker' || tile.tile === 'Joker';
+  const isJoker = tile.number === '0' || tile.number === 'joker' || tile.number === 'Joker'
+    || (tile.tile != null && tile.tile.toLowerCase().includes('joker'));
   const tileColor = TILE_COLORS[tile.color as keyof typeof TILE_COLORS] || TILE_COLORS.Black;
 
   const jokerImageSource = isJoker
