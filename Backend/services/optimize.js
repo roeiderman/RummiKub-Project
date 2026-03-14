@@ -4,6 +4,7 @@
  */
 
 const gameLogic = require('../utils/gameLogic');
+const { isJoker } = gameLogic;
 
 /**
  * Validates that all groups on the board form valid Rummikub series
@@ -71,7 +72,7 @@ function tryExtendSeries(series, rack, seriesType) {
 
     if (seriesType === 'run') {
         // For runs: try adding sequential tiles at start or end
-        const regularTiles = series.filter(t => t.number !== 'Joker' && t.number !== 'joker');
+        const regularTiles = series.filter(t => !isJoker(t));
         if (regularTiles.length === 0) return extensions;
 
         const color = regularTiles[0].color;
@@ -114,7 +115,7 @@ function tryExtendSeries(series, rack, seriesType) {
         }
     } else if (seriesType === 'set') {
         // For sets: try adding same number with different color
-        const regularTiles = series.filter(t => t.number !== 'Joker' && t.number !== 'joker');
+        const regularTiles = series.filter(t => !isJoker(t));
         if (regularTiles.length === 0) return extensions;
 
         const number = regularTiles[0].number;

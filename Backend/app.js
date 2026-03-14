@@ -18,6 +18,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const detectionRoutes = require('./routes/detection');
 const optimizeRoutes = require('./routes/optimize');
+const leaderboardRoutes = require('./routes/leaderboard');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -51,6 +52,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/detection', detectionRoutes);
 app.use('/api/optimize', optimizeRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 
 
 // Root endpoint

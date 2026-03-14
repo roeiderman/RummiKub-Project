@@ -1,5 +1,16 @@
 
 /**
+ * Returns true if a tile is a Joker, regardless of how the client encoded it.
+ * Detection model uses number="Joker"; edit screens use number="0".
+ */
+function isJoker(tile) {
+    return tile.number === 'Joker'
+        || tile.number === 'joker'
+        || tile.number === '0'
+        || (tile.tile && tile.tile.toLowerCase().includes('joker'));
+}
+
+/**
  * Check if a group of tiles forms a valid run
  * Run: 3+ tiles with same color and sequential numbers
  * Jokers can fill gaps in the sequence
@@ -8,8 +19,8 @@ function isValidRun(tiles) {
     if (!tiles || tiles.length < 3) return false;
 
     // Separate Jokers from regular tiles
-    const jokers = tiles.filter(t => t.number === 'Joker' || t.number === 'joker');
-    const regularTiles = tiles.filter(t => t.number !== 'Joker' && t.number !== 'joker');
+    const jokers = tiles.filter(t => isJoker(t));
+    const regularTiles = tiles.filter(t => !isJoker(t));
 
     // Need at least 2 regular tiles to determine color and sequence
     if (regularTiles.length < 2) return false;
@@ -56,8 +67,8 @@ function isValidSet(tiles) {
     if (!tiles || tiles.length < 3 || tiles.length > 4) return false;
 
     // Separate Jokers from regular tiles
-    const jokers = tiles.filter(t => t.number === 'Joker' || t.number === 'joker');
-    const regularTiles = tiles.filter(t => t.number !== 'Joker' && t.number !== 'joker');
+    const jokers = tiles.filter(t => isJoker(t));
+    const regularTiles = tiles.filter(t => !isJoker(t));
 
     // Need at least 2 regular tiles to determine number
     if (regularTiles.length < 2) return false;
@@ -210,6 +221,7 @@ function isValidSet(tiles) {
 
 
 module.exports = {
+    isJoker,
     isValidRun,
     isValidSet,
     //detectSeries,
