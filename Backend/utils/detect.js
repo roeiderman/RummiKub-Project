@@ -85,7 +85,9 @@ async function detectTiles(image, options = {}) {
                 // Normalize tile colors (Yellow -> Orange for Rummikub standard colors)
                 const normalizedTiles = result.tiles.map(tile => ({
                     ...tile,
-                    color: tile.color === 'Yellow' ? 'Orange' : tile.color
+                    color: tile.color === 'Yellow' ? 'Orange' : tile.color,
+                    number: parseInt(tile.number, 10), // Ensure number is a string for consistency
+                    isJoker: tile.tile.toLowerCase().includes('joker') // Add isJoker flag based on tile name
                 }));
 
                 const normalizedResult = {

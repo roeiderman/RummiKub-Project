@@ -60,301 +60,348 @@ function validateBoard(groups) {
     };
 }
 
+
 /**
- * Tries to extend an existing series with tiles from the rack
- * @param {Array} series - Existing series of tiles
- * @param {Array} rack - Available rack tiles
- * @param {string} seriesType - Type of series ('run' or 'set')
- * @returns {Array} Array of possible extensions
+ * Generates all possible combinations of 'k' elements from an array.
+ * @param {Array} array - The source array (e.g., the user's rack)
+ * @param {number} k - The number of items to pick
+ * @returns {Array} An array of combination arrays
  */
-function tryExtendSeries(series, rack, seriesType) {
-    const extensions = [];
+const getCombinations = (array, k) => {
+  // Base Case 1: If we want to pick 0 items, there is exactly one way to do that (an empty set)
+  if (k === 0) return [[]];
+  
+  // Base Case 2: If we want to pick the exact number of items we have, return the whole array
+  if (k === array.length) return [array];
+  
+  // Base Case 3: We can't pick more items than we have
+  if (k > array.length) return [];
 
-    if (seriesType === 'run') {
-        // For runs: try adding sequential tiles at start or end
-        const regularTiles = series.filter(t => !isJoker(t));
-        if (regularTiles.length === 0) return extensions;
+  const result = [];
 
-        const color = regularTiles[0].color;
-        const numbers = regularTiles.map(t => parseInt(t.number)).sort((a, b) => a - b);
-        const minNum = numbers[0];
-        const maxNum = numbers[numbers.length - 1];
-
-        // Try extending at the end (maxNum + 1, +2, etc.)
-        for (const tile of rack) {
-            if (tile.color === color) {
-                const num = parseInt(tile.number);
-                if (!isNaN(num) && num === maxNum + 1) {
-                    const newSeries = [...series, tile];
-                    if (gameLogic.isValidRun(newSeries)) {
-                        extensions.push({
-                            tilesUsed: [tile],
-                            newSeries,
-                            position: 'end'
-                        });
-                    }
-                }
-            }
-        }
-
-        // Try extending at the start (minNum - 1, -2, etc.)
-        for (const tile of rack) {
-            if (tile.color === color) {
-                const num = parseInt(tile.number);
-                if (!isNaN(num) && num === minNum - 1) {
-                    const newSeries = [tile, ...series];
-                    if (gameLogic.isValidRun(newSeries)) {
-                        extensions.push({
-                            tilesUsed: [tile],
-                            newSeries,
-                            position: 'start'
-                        });
-                    }
-                }
-            }
-        }
-    } else if (seriesType === 'set') {
-        // For sets: try adding same number with different color
-        const regularTiles = series.filter(t => !isJoker(t));
-        if (regularTiles.length === 0) return extensions;
-
-        const number = regularTiles[0].number;
-        const usedColors = new Set(regularTiles.map(t => t.color));
-
-        // Can't have more than 4 tiles in a set
-        if (series.length >= 4) return extensions;
-
-        for (const tile of rack) {
-            if (tile.number === number && !usedColors.has(tile.color)) {
-                const newSeries = [...series, tile];
-                if (gameLogic.isValidSet(newSeries)) {
-                    extensions.push({
-                        tilesUsed: [tile],
-                        newSeries,
-                        position: 'any'
-                    });
-                }
-            }
-        }
+  // Recursive Step: Lock in one item, and combine it with combinations of the remaining items
+  for (let i = 0; i <= array.length - k; i++) {
+    const fixedElement = array[i];
+    
+    // Pass the REST of the array forward, and ask for k - 1 combinations
+    const tailCombinations = getCombinations(array.slice(i + 1), k - 1);
+    
+    // Attach our locked element to the front of every combination returned
+    for (const combo of tailCombinations) {
+      result.push([fixedElement, ...combo]);
     }
+  }
 
-    return extensions;
-}
+  return result;
+};
 
-/**
- * Tries to create new series using only rack tiles
- * @param {Array} rack - Available rack tiles
- * @returns {Array} Array of possible new series
- */
-function tryCreateNewSeries(rack) {
-    const newSeries = [];
-
-    // Try combinations of 3 and 4 tiles
-    for (let size = 3; size <= Math.min(4, rack.length); size++) {
-        // Generate combinations of 'size' tiles
-        const combinations = getCombinations(rack, size);
-
-        for (const combo of combinations) {
-            // Check if it forms a valid run
-            if (gameLogic.isValidRun(combo)) {
-                newSeries.push({
-                    tilesUsed: combo,
-                    newSeries: combo,
-                    type: 'run'
-                });
-            }
-            // Check if it forms a valid set
-            else if (gameLogic.isValidSet(combo)) {
-                newSeries.push({
-                    tilesUsed: combo,
-                    newSeries: combo,
-                    type: 'set'
-                });
-            }
-        }
-    }
-
-    return newSeries;
-}
 
 /**
- * Generate all combinations of k elements from array
- * @param {Array} arr - Source array
- * @param {number} k - Number of elements to select
- * @returns {Array} Array of combinations
+ * Main Optimizer Function
+ * @param {Array} board - The current valid groups on the table (e.g., [[1,2,3], [4,4,4]])
+ * @param {Array} rack - The user's current rack tiles
+ * @param {number} timeLimitMs - Maximum allowed execution time before bailing out
  */
-function getCombinations(arr, k) {
-    if (k === 0) return [[]];
-    if (k > arr.length) return [];
+const findOptimalMove = (board, rack, timeLimitMs = 40000) => {
+  console.log('[optimize] findOptimalMove:start', {
+    boardGroups: Array.isArray(board) ? board.length : null,
+    boardTiles: Array.isArray(board) ? board.flat().length : null,
+    rackTiles: Array.isArray(rack) ? rack.length : null,
+    timeLimitMs
+  });
 
-    const result = [];
+  // Validate the board first
+  const boardValidation = validateBoard(board);
+  console.log('[optimize] findOptimalMove:boardValidation', {
+    valid: boardValidation.valid,
+    invalidGroupCount: boardValidation.errors.length,
+    validGroupCount: boardValidation.validGroups.length
+  });
 
-    function backtrack(start, current) {
-        if (current.length === k) {
-            result.push([...current]);
-            return;
-        }
-
-        for (let i = start; i < arr.length; i++) {
-            current.push(arr[i]);
-            backtrack(i + 1, current);
-            current.pop();
-        }
-    }
-
-    backtrack(0, []);
-    return result;
-}
-
-/**
- * Generates all possible moves by extending series or creating new ones
- * @param {Array} groups - Current board state
- * @param {Array} rack - Available rack tiles
- * @param {Array} validGroups - Validated groups with their types
- * @returns {Array} Array of move objects
- */
-function generatePossibleMoves(groups, rack, validGroups) {
-    const moves = [];
-
-    // Try extending each valid series
-    validGroups.forEach(({ groupIndex, type, tiles }) => {
-        const extensions = tryExtendSeries(tiles, rack, type);
-
-        extensions.forEach(extension => {
-            // Create updated board state
-            const updatedGroups = groups.map((g, idx) =>
-                idx === groupIndex ? extension.newSeries : g
-            );
-
-            // Calculate remaining rack
-            const usedTileIds = new Set(extension.tilesUsed.map(t => t.id));
-            const remainingRack = rack.filter(t => !usedTileIds.has(t.id));
-
-            moves.push({
-                tilesUsed: extension.tilesUsed,
-                moveType: 'extend_series',
-                seriesIndex: groupIndex,
-                newSeries: extension.newSeries,
-                updatedGroups,
-                remainingRack,
-                tilesPlayed: extension.tilesUsed.length
-            });
-        });
+  if (!boardValidation.valid) {
+    console.error('[optimize] findOptimalMove:invalidBoard', {
+      errors: boardValidation.errors
     });
-
-    // Try creating new series from rack
-    const newSeriesMoves = tryCreateNewSeries(rack);
-
-    newSeriesMoves.forEach(newSeriesMove => {
-        // Add new series to board
-        const updatedGroups = [...groups, newSeriesMove.newSeries];
-
-        // Calculate remaining rack
-        const usedTileIds = new Set(newSeriesMove.tilesUsed.map(t => t.id));
-        const remainingRack = rack.filter(t => !usedTileIds.has(t.id));
-
-        moves.push({
-            tilesUsed: newSeriesMove.tilesUsed,
-            moveType: 'new_series',
-            seriesIndex: null,
-            newSeries: newSeriesMove.newSeries,
-            seriesType: newSeriesMove.type,
-            updatedGroups,
-            remainingRack,
-            tilesPlayed: newSeriesMove.tilesUsed.length
-        });
-    });
-
-    return moves;
-}
-
-/**
- * Selects the best move from available options
- * @param {Array} moves - Array of possible moves
- * @returns {Object} Best move or empty move if none available
- */
-function selectBestMove(moves) {
-    if (moves.length === 0) {
-        return {
-            tilesUsed: [],
-            moveType: 'no_move',
-            seriesIndex: null,
-            newSeries: null,
-            updatedGroups: null,
-            remainingRack: null,
-            tilesPlayed: 0
-        };
-    }
-
-    // Sort by number of tiles played (descending)
-    moves.sort((a, b) => b.tilesPlayed - a.tilesPlayed);
-
-    return moves[0];
-}
-
-/**
- * Main function to find the optimal move
- * @param {Array} groups - Current board state as array of tile groups
- * @param {Array} rack - Player's rack tiles
- * @returns {Object} Optimal move with board and rack updates
- */
-async function findOptimalMove(groups, rack) {
-    // Validate the board first
-    const boardValidation = validateBoard(groups);
-
-    if (!boardValidation.valid) {
-        const error = new Error('Invalid board configuration');
-        error.statusCode = 400;
-        error.type = 'BoardInvalidError';
-        error.details = {
-            invalidGroups: boardValidation.errors
-        };
-        throw error;
-    }
-
-    // Handle empty rack case ***********************
-    if (!rack || rack.length === 0) {
-        return {
-            boardValid: true,
-            optimalMove: {
-                tilesUsed: [],
-                moveType: 'no_move',
-                seriesIndex: null,
-                newSeries: null
-            },
-            tilesPlayed: 0,
-            updatedGroups: groups,
-            remainingRack: []
-        };
-    }
-
-    // Generate all possible moves
-    const possibleMoves = generatePossibleMoves(groups, rack, boardValidation.validGroups);
-
-    // Select the best move
-    const bestMove = selectBestMove(possibleMoves);
-
-    // Return result
-    return {
-        boardValid: true,
-        optimalMove: {
-            tilesUsed: bestMove.tilesUsed,
-            moveType: bestMove.moveType,
-            seriesIndex: bestMove.seriesIndex,
-            newSeries: bestMove.newSeries,
-            seriesType: bestMove.seriesType || null
-        },
-        tilesPlayed: bestMove.tilesPlayed,
-        updatedGroups: bestMove.updatedGroups || groups,
-        remainingRack: bestMove.remainingRack || rack
+    const error = new Error('Invalid board configuration');
+    error.statusCode = 400;
+    error.type = 'BoardInvalidError';
+    error.details = {
+      invalidGroups: boardValidation.errors
     };
-}
+    throw error;
+  }
+
+  const startTime = Date.now();
+  
+  // 1. THE MELTDOWN: Destroy the board and turn it into a single pool of tiles
+  const boardPool = board.flat();
+  console.log('[optimize] findOptimalMove:boardPoolReady', {
+    boardPoolSize: boardPool.length
+  });
+
+  // 2. TOP-DOWN LOOP: Try using 14 rack tiles, then 13, then 12...
+  for (let k = rack.length; k > 0; k--) {
+    const elapsedMs = Date.now() - startTime;
+    
+    // Time Check! If we are out of time, stop searching completely.
+    if (elapsedMs > timeLimitMs) {
+      console.warn('[optimize] findOptimalMove:timeLimitReached', {
+        elapsedMs,
+        k
+      });
+      break; 
+    }
+
+    // Generate all possible ways to pick 'k' tiles from the rack
+    const rackCombinations = getCombinations(rack, k);
+    console.log('[optimize] findOptimalMove:testingK', {
+      k,
+      combinationCount: rackCombinations.length,
+      elapsedMs
+    });
+
+    for (let comboIndex = 0; comboIndex < rackCombinations.length; comboIndex++) {
+      const rackCombo = rackCombinations[comboIndex];
+      // Create our test universe: The whole board + this specific combination of rack tiles
+      const testPool = [...boardPool, ...rackCombo];
+
+      // 3. THE BACKTRACKING ENGINE: Can this exact pool be split into valid sets?
+      const resultBoard = solveExactCover(testPool, startTime, timeLimitMs);
+
+      // 4. SHORT-CIRCUIT: Because we started from the highest 'k', the first success
+      // is mathematically guaranteed to be the maximum possible tiles played!
+      if (resultBoard) {
+        console.log('[optimize] findOptimalMove:solutionFound', {
+          k,
+          comboIndex,
+          totalCombinationsForK: rackCombinations.length,
+          resultGroups: resultBoard.length,
+          elapsedMs: Date.now() - startTime
+        });
+        return {
+          success: true,
+          tilesUsed: k,
+          rackTilesPlayed: rackCombo,
+          finalBoard: resultBoard
+        };
+      }
+    }
+
+    console.log('[optimize] findOptimalMove:noSolutionForK', {
+      k,
+      testedCombinations: rackCombinations.length,
+      elapsedMs: Date.now() - startTime
+    });
+  }
+
+  // If we get here, no valid moves were found with the given rack
+  console.warn('[optimize] findOptimalMove:noMoveFound', {
+    elapsedMs: Date.now() - startTime
+  });
+  return { success: false, message: "No valid moves found. Draw a tile." };
+};
+
+/**
+ * Optimized Backtracking Solver for Rummikub (Joker Support)
+ */
+const solveExactCover = (remainingPool, startTime, timeLimitMs, currentBoard = []) => {
+  // Base Case: If the pool is completely empty, we won!
+  if (remainingPool.length === 0) {
+    return currentBoard; 
+  }
+
+  // Safety Net: Time limit check
+  if (Date.now() - startTime > timeLimitMs) return null;
+
+  // 1. SEPARATE JOKERS FROM REGULAR TILES
+  const regularTiles = remainingPool.filter(t => !isJoker(t));
+  const jokersAvailable = remainingPool.filter(t => isJoker(t)).length;
+
+  // Edge case: If we only have Jokers left, but no regular tiles, 
+  // it's an invalid state (you can't play a Joker by itself).
+  if (regularTiles.length === 0 && jokersAvailable > 0) return null;
+
+  // 2. THE TARGET TILE OPTIMIZATION
+  // We pick exactly ONE tile that MUST be used in this step. 
+  // This completely eliminates checking duplicate branches!
+  const targetTile = regularTiles[0];
+
+  // 3. GENERATE SETS FOR THIS SPECIFIC TILE
+  // We pass the jokersAvailable count so the generator knows if it can use wildcards
+  const possibleSets = generateValidSetsForTarget(targetTile, remainingPool, jokersAvailable);
+
+  // If this specific tile cannot be placed into ANY valid set, the board is dead.
+  // We don't need to check the other tiles. Backtrack immediately!
+  if (possibleSets.length === 0) {
+    return null; 
+  }
+
+  // 4. RECURSIVE STEP
+  for (const set of possibleSets) {
+    
+    // Remove the tiles (including the Jokers) used in this set from the pool
+    const newPool = removeTilesFromPool(remainingPool, set);
+    
+    const result = solveExactCover(
+      newPool, 
+      startTime, 
+      timeLimitMs, 
+      [...currentBoard, set]
+    );
+
+    if (result) return result;
+  }
+
+  return null;
+};
+
+/**
+ * Safely removes a specific set of tiles from the available pool.
+ * @param {Array} pool - The current available tiles.
+ * @param {Array} set - The valid Rummikub set to remove.
+ * @returns {Array} A new array of the remaining tiles.
+ */
+const removeTilesFromPool = (pool, set) => {
+  // 1. Create a shallow clone of the pool so we don't mutate the backtracking state
+  const remainingPool = [...pool];
+
+  // 2. Loop through every tile we need to remove
+  for (const tileToRemove of set) {
+    let indexToRemove = -1;
+
+    if (isJoker(tileToRemove)) {
+      // THE JOKER FIX: If the set needs a Joker (even if it's disguised as a Red 5),
+      // we must find and remove a raw Joker from the pool.
+      indexToRemove = remainingPool.findIndex(t => isJoker(t) === true || (t.isJoker === true)); // Support both boolean and explicit isJoker property
+    } else {
+      // REGULAR TILE: Find the exact matching color and number.
+      // We explicitly check !t.isJoker so we don't accidentally delete a Joker.
+      indexToRemove = remainingPool.findIndex(t => 
+        (!isJoker(t) || t.isJoker !== true) && 
+        t.color === tileToRemove.color && 
+        t.number === tileToRemove.number
+      );
+    }
+
+    // 3. Remove the tile if we found it
+    if (indexToRemove !== -1) {
+      remainingPool.splice(indexToRemove, 1);
+    } else {
+      // Safety net: This should never trigger if your set generator is mathematically perfect
+      console.error("Critical Math Error: Tried to remove a tile not in the pool!", tileToRemove);
+    }
+  }
+
+  // 4. Return the new, smaller pool to pass down to the next recursive step
+  return remainingPool;
+};
+
+/**
+ * Generates all possible valid Rummikub sets (Runs and Groups) that explicitly 
+ * include the targetTile, utilizing available Jokers if necessary.
+ * * @param {Object} targetTile - The mandatory tile (e.g., {color: 'red', number: 7, isJoker: false})
+ * @param {Array} pool - All currently available tiles
+ * @param {number} jokersAvailable - The number of Jokers we are allowed to use
+ * @returns {Array} An array of valid sets (each set is an array of tile objects)
+ */
+const generateValidSetsForTarget = (targetTile, pool, jokersAvailable) => {
+  const validSets = [];
+  const COLORS = ['Red', 'Blue', 'Black', 'Orange'];
+  const { color: tColor, number: tNumber } = targetTile;
+
+
+  // 1. CREATE A FAST-LOOKUP INVENTORY
+  // Instead of using .find() a thousand times, we map the pool to a dictionary.
+  const poolInventory = {};
+  pool.forEach(t => {
+    if (!isJoker(t)) {
+      const key = `${t.color}_${t.number}`;
+      poolInventory[key] = (poolInventory[key] || 0) + 1;
+    }
+  });
+
+  // We must deduct the targetTile itself from the inventory so we don't accidentally use it twice
+  poolInventory[`${tColor}_${tNumber}`]--;
+
+  // ==========================================
+  // LOGIC BLOCK 1: GENERATE GROUPS (Same Number, Different Colors)
+  // A valid group is 3 or 4 tiles. 
+  // ==========================================
+  
+  // Find the colors we don't have yet
+  const otherColors = COLORS.filter(c => c !== tColor);
+
+  // All mathematically possible color combinations to finish a group of 3 or 4
+  const groupCombinations = [
+    [otherColors[0], otherColors[1]],                 // 3-tile group option A
+    [otherColors[0], otherColors[2]],                 // 3-tile group option B
+    [otherColors[1], otherColors[2]],                 // 3-tile group option C
+    [otherColors[0], otherColors[1], otherColors[2]]  // 4-tile group (All colors)
+  ];
+
+  for (const combo of groupCombinations) {
+    let jokersNeeded = 0;
+    const currentGroup = [targetTile]; // The target tile anchors the group
+
+    for (const neededColor of combo) {
+      const key = `${neededColor}_${tNumber}`;
+      
+      if (poolInventory[key] > 0) {
+        // We have the real tile in our pool!
+        currentGroup.push({ color: neededColor, number: tNumber, isJoker: false });
+      } else {
+        // We are missing the tile. We must spend a Joker and disguise it!
+        jokersNeeded++;
+        currentGroup.push({ color: neededColor, number: tNumber, isJoker: true });
+      }
+    }
+
+    // If we have enough Jokers in our hand to bridge the gaps, this group is valid!
+    if (jokersNeeded <= jokersAvailable) {
+      validSets.push(currentGroup);
+    }
+  }
+
+  // ==========================================
+  // LOGIC BLOCK 2: GENERATE RUNS (Same Color, Consecutive Numbers)
+  // A valid run is 3 to 13 tiles long.
+  // ==========================================
+
+  // We test every possible starting point and ending point for a run
+  // that could possibly wrap around our target tile.
+  for (let start = 1; start <= tNumber; start++) {
+    for (let end = Math.max(start + 2, tNumber); end <= 13; end++) {
+      
+      let jokersNeeded = 0;
+      const currentRun = [];
+
+      for (let v = start; v <= end; v++) {
+        if (v === tNumber) {
+          // It's our target tile! We already have it.
+          currentRun.push(targetTile);
+        } else {
+          // Check if we have this specific number in our inventory
+          const key = `${tColor}_${v}`;
+          if (poolInventory[key] > 0) {
+             currentRun.push({ color: tColor, number: v, isJoker: false});
+          } else {
+             jokersNeeded++;
+             currentRun.push({ color: tColor, number: v, isJoker: true});
+          }
+        }
+      }
+
+      // If we didn't exceed our Joker limit, this is a mathematically valid run
+      if (jokersNeeded <= jokersAvailable) {
+        validSets.push(currentRun);
+      }
+    }
+  }
+
+  return validSets;
+};
 
 module.exports = {
     validateBoard,
-    findOptimalMove,
-    tryExtendSeries,
-    tryCreateNewSeries,
-    generatePossibleMoves,
-    selectBestMove
+    findOptimalMove
 };

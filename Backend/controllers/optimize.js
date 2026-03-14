@@ -34,6 +34,7 @@ const optimize = async (req, res, next) => {
 
         // Call service to find optimal move.
         const result = await optimizeService.findOptimalMove(groups, rack);
+        console.log('Optimal move result:', result.finalBoard ? result.finalBoard : 'No final board state available'); // Log the final board state for debugging.
 
         // Success response.
         res.status(200).json({
