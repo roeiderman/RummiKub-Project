@@ -86,12 +86,12 @@ export default function EditChooserScreen() {
         recordTurn(tilesPlayed).catch(() => {});
 
         // Format the move description
-        let moveDescription = '';
-        if (optimalMove.moveType === 'extend') {
-          moveDescription = `Extend group ${(optimalMove.seriesIndex || 0) + 1} with ${tilesPlayed} tile(s)`;
-        } else {
-          moveDescription = `Create new ${optimalMove.seriesType} with ${tilesPlayed} tile(s)`;
-        }
+        // let moveDescription = '';
+        // if (optimalMove.moveType === 'extend') {
+        //   moveDescription = `Extend group ${(optimalMove.seriesIndex || 0) + 1} with ${tilesPlayed} tile(s)`;
+        // } else {
+        //   moveDescription = `Create new ${optimalMove.seriesType} with ${tilesPlayed} tile(s)`;
+        // }
 
         // Show tiles used
         const tilesUsedText = optimalMove.tilesUsed
@@ -100,7 +100,8 @@ export default function EditChooserScreen() {
 
         Alert.alert(
           'Optimal Move Found!',
-          `${moveDescription}\n\nTiles to play: ${tilesUsedText}\n\nTiles played: ${tilesPlayed}`,
+          //`${moveDescription}\n\nTiles to play: ${tilesUsedText}\n\nTiles played: ${tilesPlayed}`,
+          (''),
           [
             {
               text: 'View Details',

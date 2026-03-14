@@ -7,6 +7,7 @@ function isJoker(tile) {
     return tile.number === 'Joker'
         || tile.number === 'joker'
         || tile.number === '0'
+        || tile.isJoker
         || (tile.tile && tile.tile.toLowerCase().includes('joker'));
 }
 

@@ -60,44 +60,108 @@ function validateBoard(groups) {
     };
 }
 
+
+/**
+ * Generates all possible combinations of 'k' elements from an array.
+ * @param {Array} array - The source array (e.g., the user's rack)
+ * @param {number} k - The number of items to pick
+ * @returns {Array} An array of combination arrays
+ */
+const getCombinations = (array, k) => {
+  // Base Case 1: If we want to pick 0 items, there is exactly one way to do that (an empty set)
+  if (k === 0) return [[]];
+  
+  // Base Case 2: If we want to pick the exact number of items we have, return the whole array
+  if (k === array.length) return [array];
+  
+  // Base Case 3: We can't pick more items than we have
+  if (k > array.length) return [];
+
+  const result = [];
+
+  // Recursive Step: Lock in one item, and combine it with combinations of the remaining items
+  for (let i = 0; i <= array.length - k; i++) {
+    const fixedElement = array[i];
+    
+    // Pass the REST of the array forward, and ask for k - 1 combinations
+    const tailCombinations = getCombinations(array.slice(i + 1), k - 1);
+    
+    // Attach our locked element to the front of every combination returned
+    for (const combo of tailCombinations) {
+      result.push([fixedElement, ...combo]);
+    }
+  }
+
+  return result;
+};
+
+
 /**
  * Main Optimizer Function
  * @param {Array} board - The current valid groups on the table (e.g., [[1,2,3], [4,4,4]])
  * @param {Array} rack - The user's current rack tiles
  * @param {number} timeLimitMs - Maximum allowed execution time before bailing out
  */
-const findOptimalMove = (board, rack, timeLimitMs = 2500) => {
+const findOptimalMove = (board, rack, timeLimitMs = 40000) => {
+  console.log('[optimize] findOptimalMove:start', {
+    boardGroups: Array.isArray(board) ? board.length : null,
+    boardTiles: Array.isArray(board) ? board.flat().length : null,
+    rackTiles: Array.isArray(rack) ? rack.length : null,
+    timeLimitMs
+  });
 
-    // Validate the board first
-    const boardValidation = validateBoard(groups);
-    if (!boardValidation.valid) {
-        const error = new Error('Invalid board configuration');
-        error.statusCode = 400;
-        error.type = 'BoardInvalidError';
-        error.details = {
-            invalidGroups: boardValidation.errors
-        };
-        throw error;
-    }
+  // Validate the board first
+  const boardValidation = validateBoard(board);
+  console.log('[optimize] findOptimalMove:boardValidation', {
+    valid: boardValidation.valid,
+    invalidGroupCount: boardValidation.errors.length,
+    validGroupCount: boardValidation.validGroups.length
+  });
+
+  if (!boardValidation.valid) {
+    console.error('[optimize] findOptimalMove:invalidBoard', {
+      errors: boardValidation.errors
+    });
+    const error = new Error('Invalid board configuration');
+    error.statusCode = 400;
+    error.type = 'BoardInvalidError';
+    error.details = {
+      invalidGroups: boardValidation.errors
+    };
+    throw error;
+  }
 
   const startTime = Date.now();
   
   // 1. THE MELTDOWN: Destroy the board and turn it into a single pool of tiles
   const boardPool = board.flat();
+  console.log('[optimize] findOptimalMove:boardPoolReady', {
+    boardPoolSize: boardPool.length
+  });
 
   // 2. TOP-DOWN LOOP: Try using 14 rack tiles, then 13, then 12...
   for (let k = rack.length; k > 0; k--) {
+    const elapsedMs = Date.now() - startTime;
     
     // Time Check! If we are out of time, stop searching completely.
-    if (Date.now() - startTime > timeLimitMs) {
-      console.log(`[Solver] Time limit reached! Bailing out at k=${k}`);
+    if (elapsedMs > timeLimitMs) {
+      console.warn('[optimize] findOptimalMove:timeLimitReached', {
+        elapsedMs,
+        k
+      });
       break; 
     }
 
     // Generate all possible ways to pick 'k' tiles from the rack
     const rackCombinations = getCombinations(rack, k);
+    console.log('[optimize] findOptimalMove:testingK', {
+      k,
+      combinationCount: rackCombinations.length,
+      elapsedMs
+    });
 
-    for (const rackCombo of rackCombinations) {
+    for (let comboIndex = 0; comboIndex < rackCombinations.length; comboIndex++) {
+      const rackCombo = rackCombinations[comboIndex];
       // Create our test universe: The whole board + this specific combination of rack tiles
       const testPool = [...boardPool, ...rackCombo];
 
@@ -107,6 +171,13 @@ const findOptimalMove = (board, rack, timeLimitMs = 2500) => {
       // 4. SHORT-CIRCUIT: Because we started from the highest 'k', the first success
       // is mathematically guaranteed to be the maximum possible tiles played!
       if (resultBoard) {
+        console.log('[optimize] findOptimalMove:solutionFound', {
+          k,
+          comboIndex,
+          totalCombinationsForK: rackCombinations.length,
+          resultGroups: resultBoard.length,
+          elapsedMs: Date.now() - startTime
+        });
         return {
           success: true,
           tilesUsed: k,
@@ -115,9 +186,18 @@ const findOptimalMove = (board, rack, timeLimitMs = 2500) => {
         };
       }
     }
+
+    console.log('[optimize] findOptimalMove:noSolutionForK', {
+      k,
+      testedCombinations: rackCombinations.length,
+      elapsedMs: Date.now() - startTime
+    });
   }
 
   // If we get here, no valid moves were found with the given rack
+  console.warn('[optimize] findOptimalMove:noMoveFound', {
+    elapsedMs: Date.now() - startTime
+  });
   return { success: false, message: "No valid moves found. Draw a tile." };
 };
 
@@ -192,12 +272,12 @@ const removeTilesFromPool = (pool, set) => {
     if (isJoker(tileToRemove)) {
       // THE JOKER FIX: If the set needs a Joker (even if it's disguised as a Red 5),
       // we must find and remove a raw Joker from the pool.
-      indexToRemove = remainingPool.findIndex(t => isJoker(t) === true);
+      indexToRemove = remainingPool.findIndex(t => isJoker(t) === true || (t.isJoker === true)); // Support both boolean and explicit isJoker property
     } else {
       // REGULAR TILE: Find the exact matching color and number.
       // We explicitly check !t.isJoker so we don't accidentally delete a Joker.
       indexToRemove = remainingPool.findIndex(t => 
-        !isJoker(t) && 
+        (!isJoker(t) || t.isJoker !== true) && 
         t.color === tileToRemove.color && 
         t.number === tileToRemove.number
       );
@@ -226,8 +306,9 @@ const removeTilesFromPool = (pool, set) => {
  */
 const generateValidSetsForTarget = (targetTile, pool, jokersAvailable) => {
   const validSets = [];
-  const COLORS = ['red', 'blue', 'black', 'yellow'];
+  const COLORS = ['Red', 'Blue', 'Black', 'Orange'];
   const { color: tColor, number: tNumber } = targetTile;
+
 
   // 1. CREATE A FAST-LOOKUP INVENTORY
   // Instead of using .find() a thousand times, we map the pool to a dictionary.
@@ -302,10 +383,10 @@ const generateValidSetsForTarget = (targetTile, pool, jokersAvailable) => {
           // Check if we have this specific number in our inventory
           const key = `${tColor}_${v}`;
           if (poolInventory[key] > 0) {
-             currentRun.push({ color: tColor, number: v, isJoker: false });
+             currentRun.push({ color: tColor, number: v, isJoker: false});
           } else {
              jokersNeeded++;
-             currentRun.push({ color: tColor, number: v, isJoker: true });
+             currentRun.push({ color: tColor, number: v, isJoker: true});
           }
         }
       }
