@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { EDITOR_THEME } from '../src/constants/colors';
@@ -78,7 +78,8 @@ export default function EditChooserScreen() {
       const result = await findOptimalMove(groups, rack);
 
       // Show results
-      if (result.data.tilesPlayed === 0) {
+      const optimizeData = result.data as any;
+      if (!optimizeData.success) {
         recordTurn(0).catch(() => {});
         Alert.alert(
           'No Move Found',
@@ -89,23 +90,10 @@ export default function EditChooserScreen() {
           ]
         );
       } else {
-        const { optimalMove, tilesPlayed, updatedGroups, remainingRack } = result.data;
+        const tilesUsed: number = optimizeData.tilesUsed ?? 0;
 
-        // Record turn in leaderboard
-        recordTurn(tilesPlayed).catch(() => {});
-
-        // Format the move description
-        // let moveDescription = '';
-        // if (optimalMove.moveType === 'extend') {
-        //   moveDescription = `Extend group ${(optimalMove.seriesIndex || 0) + 1} with ${tilesPlayed} tile(s)`;
-        // } else {
-        //   moveDescription = `Create new ${optimalMove.seriesType} with ${tilesPlayed} tile(s)`;
-        // }
-
-        // Show tiles used
-        const tilesUsedText = optimalMove.tilesUsed
-          .map(t => t.tile)
-          .join(', ');
+        // Record turn in leaderboard — increments totalTurns and updates maxTilesInOneTurn if new best
+        recordTurn(tilesUsed).catch(() => {});
 
         Alert.alert(
           'Optimal Move Found!',
