@@ -133,8 +133,11 @@ const findOptimalMove = (board, rack, timeLimitMs = 40000) => {
 
   const startTime = Date.now();
   
-  // 1. THE MELTDOWN: Destroy the board and turn it into a single pool of tiles
-  const boardPool = board.flat();
+  // 1. THE MELTDOWN: Destroy the board and turn it into a single pool of tiles.
+  // Tag each tile with its source so the move reconstructor can read it directly.
+  const boardPool = board.flatMap((group, gi) =>
+    group.map(tile => ({ ...tile, _source: 'board', _sourceGroupIndex: gi }))
+  );
   console.log('[optimize] findOptimalMove:boardPoolReady', {
     boardPoolSize: boardPool.length
   });
@@ -162,8 +165,10 @@ const findOptimalMove = (board, rack, timeLimitMs = 40000) => {
 
     for (let comboIndex = 0; comboIndex < rackCombinations.length; comboIndex++) {
       const rackCombo = rackCombinations[comboIndex];
-      // Create our test universe: The whole board + this specific combination of rack tiles
-      const testPool = [...boardPool, ...rackCombo];
+      // Create our test universe: The whole board + this specific combination of rack tiles.
+      // Tag rack tiles so attribution is unambiguous.
+      const taggedRackCombo = rackCombo.map(tile => ({ ...tile, _source: 'rack' }));
+      const testPool = [...boardPool, ...taggedRackCombo];
 
       // 3. THE BACKTRACKING ENGINE: Can this exact pool be split into valid sets?
       const resultBoard = solveExactCover(testPool, startTime, timeLimitMs);
@@ -310,8 +315,7 @@ const generateValidSetsForTarget = (targetTile, pool, jokersAvailable) => {
   const { color: tColor, number: tNumber } = targetTile;
 
 
-  // 1. CREATE A FAST-LOOKUP INVENTORY
-  // Instead of using .find() a thousand times, we map the pool to a dictionary.
+  // 1. CREATE A FAST-LOOKUP INVENTORY (count-based, for availability checks)
   const poolInventory = {};
   pool.forEach(t => {
     if (!isJoker(t)) {
@@ -320,43 +324,62 @@ const generateValidSetsForTarget = (targetTile, pool, jokersAvailable) => {
     }
   });
 
-  // We must deduct the targetTile itself from the inventory so we don't accidentally use it twice
+  // Deduct the targetTile so we don't use it twice
   poolInventory[`${tColor}_${tNumber}`]--;
+
+  // 2. BUILD OBJECT LOOKUP so we return real tile objects (preserving _source tags)
+  //    poolByKey[key] = array of actual tile objects with that color+number
+  const poolByKey = {};
+  const jokerTiles = [];
+  pool.forEach(t => {
+    if (isJoker(t)) {
+      jokerTiles.push(t);
+    } else {
+      const key = `${t.color}_${t.number}`;
+      if (!poolByKey[key]) poolByKey[key] = [];
+      poolByKey[key].push(t);
+    }
+  });
+
+  // Remove targetTile from its own key so it isn't returned as its own neighbor
+  const targetKey = `${tColor}_${tNumber}`;
+  if (poolByKey[targetKey]) {
+    const idx = poolByKey[targetKey].indexOf(targetTile);
+    if (idx !== -1) poolByKey[targetKey].splice(idx, 1);
+  }
+
+  // Helper: get the real tile object for a slot, falling back to a plain object if missing
+  const pickTile = (color, number) => {
+    const key = `${color}_${number}`;
+    return (poolByKey[key] && poolByKey[key][0]) || { color, number, isJoker: false };
+  };
+  // Helper: get the real joker tile for a joker slot (jokerIndex tracks usage within this set)
+  const pickJoker = (jokerIndex) => jokerTiles[jokerIndex] || { isJoker: true };
 
   // ==========================================
   // LOGIC BLOCK 1: GENERATE GROUPS (Same Number, Different Colors)
-  // A valid group is 3 or 4 tiles. 
   // ==========================================
-  
-  // Find the colors we don't have yet
   const otherColors = COLORS.filter(c => c !== tColor);
-
-  // All mathematically possible color combinations to finish a group of 3 or 4
   const groupCombinations = [
-    [otherColors[0], otherColors[1]],                 // 3-tile group option A
-    [otherColors[0], otherColors[2]],                 // 3-tile group option B
-    [otherColors[1], otherColors[2]],                 // 3-tile group option C
-    [otherColors[0], otherColors[1], otherColors[2]]  // 4-tile group (All colors)
+    [otherColors[0], otherColors[1]],
+    [otherColors[0], otherColors[2]],
+    [otherColors[1], otherColors[2]],
+    [otherColors[0], otherColors[1], otherColors[2]]
   ];
 
   for (const combo of groupCombinations) {
     let jokersNeeded = 0;
-    const currentGroup = [targetTile]; // The target tile anchors the group
+    const currentGroup = [targetTile];
 
     for (const neededColor of combo) {
       const key = `${neededColor}_${tNumber}`;
-      
       if (poolInventory[key] > 0) {
-        // We have the real tile in our pool!
-        currentGroup.push({ color: neededColor, number: tNumber, isJoker: false });
+        currentGroup.push(pickTile(neededColor, tNumber));
       } else {
-        // We are missing the tile. We must spend a Joker and disguise it!
-        jokersNeeded++;
-        currentGroup.push({ color: neededColor, number: tNumber, isJoker: true });
+        currentGroup.push(pickJoker(jokersNeeded++));
       }
     }
 
-    // If we have enough Jokers in our hand to bridge the gaps, this group is valid!
     if (jokersNeeded <= jokersAvailable) {
       validSets.push(currentGroup);
     }
@@ -364,34 +387,25 @@ const generateValidSetsForTarget = (targetTile, pool, jokersAvailable) => {
 
   // ==========================================
   // LOGIC BLOCK 2: GENERATE RUNS (Same Color, Consecutive Numbers)
-  // A valid run is 3 to 13 tiles long.
   // ==========================================
-
-  // We test every possible starting point and ending point for a run
-  // that could possibly wrap around our target tile.
   for (let start = 1; start <= tNumber; start++) {
     for (let end = Math.max(start + 2, tNumber); end <= 13; end++) {
-      
       let jokersNeeded = 0;
       const currentRun = [];
 
       for (let v = start; v <= end; v++) {
         if (v === tNumber) {
-          // It's our target tile! We already have it.
           currentRun.push(targetTile);
         } else {
-          // Check if we have this specific number in our inventory
           const key = `${tColor}_${v}`;
           if (poolInventory[key] > 0) {
-             currentRun.push({ color: tColor, number: v, isJoker: false});
+            currentRun.push(pickTile(tColor, v));
           } else {
-             jokersNeeded++;
-             currentRun.push({ color: tColor, number: v, isJoker: true});
+            currentRun.push(pickJoker(jokersNeeded++));
           }
         }
       }
 
-      // If we didn't exceed our Joker limit, this is a mathematically valid run
       if (jokersNeeded <= jokersAvailable) {
         validSets.push(currentRun);
       }

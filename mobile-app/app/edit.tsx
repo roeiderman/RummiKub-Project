@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { EDITOR_THEME } from '../src/constants/colors';
@@ -54,7 +54,10 @@ export default function EditChooserScreen() {
         Alert.alert(
           'No Data',
           'No tiles detected. Please upload images again.',
-          [{ text: 'OK' }]
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Upload New Images', onPress: () => router.replace('/home') },
+          ]
         );
         return;
       }
@@ -63,7 +66,10 @@ export default function EditChooserScreen() {
         Alert.alert(
           'No Rack Tiles',
           'You need tiles in your rack to find a move.',
-          [{ text: 'OK' }]
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Upload New Images', onPress: () => router.replace('/home') },
+          ]
         );
         return;
       }
@@ -72,31 +78,22 @@ export default function EditChooserScreen() {
       const result = await findOptimalMove(groups, rack);
 
       // Show results
-      if (result.data.tilesPlayed === 0) {
+      const optimizeData = result.data as any;
+      if (!optimizeData.success) {
         recordTurn(0).catch(() => {});
         Alert.alert(
           'No Move Found',
           'No valid moves available with your current tiles.',
-          [{ text: 'OK' }]
+          [
+            { text: 'OK', style: 'cancel' },
+            { text: 'Upload New Images', onPress: () => router.replace('/home') },
+          ]
         );
       } else {
-        const { optimalMove, tilesPlayed, updatedGroups, remainingRack } = result.data;
+        const tilesUsed: number = optimizeData.tilesUsed ?? 0;
 
-        // Record turn in leaderboard
-        recordTurn(tilesPlayed).catch(() => {});
-
-        // Format the move description
-        // let moveDescription = '';
-        // if (optimalMove.moveType === 'extend') {
-        //   moveDescription = `Extend group ${(optimalMove.seriesIndex || 0) + 1} with ${tilesPlayed} tile(s)`;
-        // } else {
-        //   moveDescription = `Create new ${optimalMove.seriesType} with ${tilesPlayed} tile(s)`;
-        // }
-
-        // Show tiles used
-        const tilesUsedText = optimalMove.tilesUsed
-          .map(t => t.tile)
-          .join(', ');
+        // Record turn in leaderboard — increments totalTurns and updates maxTilesInOneTurn if new best
+        recordTurn(tilesUsed).catch(() => {});
 
         Alert.alert(
           'Optimal Move Found!',
@@ -156,6 +153,7 @@ export default function EditChooserScreen() {
                 });
               },
             },
+            { text: 'Upload New Images', onPress: () => router.replace('/home') },
             { text: 'Cancel', style: 'cancel' },
           ]
         );
@@ -165,7 +163,10 @@ export default function EditChooserScreen() {
         Alert.alert(
           'Optimization Error',
           error.message || 'Failed to find optimal move. Please try again.',
-          [{ text: 'OK' }]
+          [
+            { text: 'OK', style: 'cancel' },
+            { text: 'Upload New Images', onPress: () => router.replace('/home') },
+          ]
         );
       }
     } finally {
