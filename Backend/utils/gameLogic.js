@@ -1,12 +1,17 @@
 
 /**
  * Returns true if a tile is a Joker, regardless of how the client encoded it.
- * Detection model uses number="Joker"; edit screens use number="0".
+ * Handles all known encodings:
+ *   number: "Joker" | "joker" | "0" | 0 | null
+ *   isJoker: true
+ *   tile: "...joker..." (string containing "joker")
  */
 function isJoker(tile) {
     return tile.number === 'Joker'
         || tile.number === 'joker'
         || tile.number === '0'
+        || tile.number === 0
+        || tile.number === null
         || tile.isJoker
         || (tile.tile && tile.tile.toLowerCase().includes('joker'));
 }
@@ -74,9 +79,10 @@ function isValidSet(tiles) {
     // Need at least 2 regular tiles to determine number
     if (regularTiles.length < 2) return false;
 
-    // Check all regular tiles have same number
-    const number = regularTiles[0].number;
-    if (!regularTiles.every(t => t.number === number)) return false;
+    // Check all regular tiles have same number (normalize to int to handle "5" vs 5)
+    const number = parseInt(regularTiles[0].number);
+    if (isNaN(number)) return false;
+    if (!regularTiles.every(t => parseInt(t.number) === number)) return false;
 
     // Check all regular tiles have different colors
     const colors = regularTiles.map(t => t.color);

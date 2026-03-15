@@ -54,7 +54,10 @@ export default function EditChooserScreen() {
         Alert.alert(
           'No Data',
           'No tiles detected. Please upload images again.',
-          [{ text: 'OK' }]
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Upload New Images', onPress: () => router.replace('/home') },
+          ]
         );
         return;
       }
@@ -63,7 +66,10 @@ export default function EditChooserScreen() {
         Alert.alert(
           'No Rack Tiles',
           'You need tiles in your rack to find a move.',
-          [{ text: 'OK' }]
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Upload New Images', onPress: () => router.replace('/home') },
+          ]
         );
         return;
       }
@@ -77,7 +83,10 @@ export default function EditChooserScreen() {
         Alert.alert(
           'No Move Found',
           'No valid moves available with your current tiles.',
-          [{ text: 'OK' }]
+          [
+            { text: 'OK', style: 'cancel' },
+            { text: 'Upload New Images', onPress: () => router.replace('/home') },
+          ]
         );
       } else {
         const { optimalMove, tilesPlayed, updatedGroups, remainingRack } = result.data;
@@ -156,6 +165,7 @@ export default function EditChooserScreen() {
                 });
               },
             },
+            { text: 'Upload New Images', onPress: () => router.replace('/home') },
             { text: 'Cancel', style: 'cancel' },
           ]
         );
@@ -165,7 +175,10 @@ export default function EditChooserScreen() {
         Alert.alert(
           'Optimization Error',
           error.message || 'Failed to find optimal move. Please try again.',
-          [{ text: 'OK' }]
+          [
+            { text: 'OK', style: 'cancel' },
+            { text: 'Upload New Images', onPress: () => router.replace('/home') },
+          ]
         );
       }
     } finally {

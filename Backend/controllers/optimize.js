@@ -1,4 +1,5 @@
 const optimizeService = require('../services/optimize');
+const { reconstructMoves } = require('../services/moveReconstructor');
 
 /**
  * Get the rack json and the groups array (board tiles), and calculate the optimal move
@@ -35,6 +36,13 @@ const optimize = async (req, res, next) => {
         // Call service to find optimal move.
         const result = await optimizeService.findOptimalMove(groups, rack);
         console.log('Optimal move result:', result.finalBoard ? result.finalBoard : 'No final board state available'); // Log the final board state for debugging.
+
+        // Reconstruct the sequence of moves from initial state → final board.
+        // Use rackTilesPlayed (not the full rack) so only actually-played rack tiles
+        // are attributed as 'rack' source; everything else maps back to the board.
+        if (result.success && result.finalBoard) {
+            result.moves = reconstructMoves(groups, result.rackTilesPlayed || [], result.finalBoard);
+        }
 
         // Success response.
         res.status(200).json({
