@@ -151,7 +151,7 @@ export default function EditBoardScreen() {
         </TouchableOpacity>
 
         <View style={styles.titleButton}>
-          <Text style={styles.title}>Edit your deck</Text>
+          <Text style={styles.title}>Edit board</Text>
         </View>
 
         {/* Spacer for centering */}

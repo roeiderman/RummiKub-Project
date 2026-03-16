@@ -1,33 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
-import { TileData } from '../types/tile';
+import { RummikubTile, OptimizeResponse } from '../types/tile';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 
-export interface OptimalMove {
-  tilesUsed: TileData[];
-  moveType: 'extend' | 'new_series';
-  seriesIndex?: number;
-  newSeries?: TileData[];
-  seriesType?: 'run' | 'set';
-}
-
-export interface OptimizeResult {
-  boardValid: boolean;
-  optimalMove: OptimalMove;
-  tilesPlayed: number;
-  updatedGroups: TileData[][];
-  remainingRack: TileData[];
-}
-
-export interface OptimizeResponse {
-  success: boolean;
-  data: OptimizeResult;
-  message: string;
-}
-
 export const findOptimalMove = async (
-  groups: TileData[][],
-  rack: TileData[]
+  groups: RummikubTile[][],
+  rack: RummikubTile[]
 ): Promise<OptimizeResponse> => {
   try {
     // Get token from secure storage
