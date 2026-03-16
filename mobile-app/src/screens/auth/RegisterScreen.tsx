@@ -70,7 +70,7 @@ export default function RegisterScreen() {
         <TextInput
           style={styles.input}
           placeholder="Full name"
-          placeholderTextColor="#6f6a95"
+          placeholderTextColor="#000000"
           value={name}
           onChangeText={setName}
         />
@@ -78,7 +78,7 @@ export default function RegisterScreen() {
         <TextInput
           style={styles.input}
           placeholder="Email"
-          placeholderTextColor="#6f6a95"
+          placeholderTextColor="#000000"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -87,7 +87,7 @@ export default function RegisterScreen() {
         <TextInput
           style={styles.input}
           placeholder="Password"
-          placeholderTextColor="#6f6a95"
+          placeholderTextColor="#000000"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     minHeight: 520,
   },
   cardTitle: {
-    color: COLORS.text,
+    color: COLORS.text2,
     fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',

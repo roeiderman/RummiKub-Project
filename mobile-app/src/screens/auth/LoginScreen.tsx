@@ -57,7 +57,7 @@ export default function LoginScreen() {
         <TextInput
           style={styles.input}
           placeholder="Email"
-          placeholderTextColor="#6f6a95"
+          placeholderTextColor="#000000"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -67,7 +67,7 @@ export default function LoginScreen() {
         <TextInput
           style={styles.input}
           placeholder="Password"
-          placeholderTextColor="#6f6a95"
+          placeholderTextColor="#000000"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -83,11 +83,11 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.footerText}>
+        {/* <Text style={styles.footerText}>
           By signing up you agree to the{' '}
           <Text style={styles.linkText}>Terms of Service</Text> and{' '}
           <Text style={styles.linkText}>Privacy Policy</Text>
-        </Text>
+        </Text> */}
       </View>
     </SafeAreaView>
   );
@@ -126,14 +126,14 @@ const styles = StyleSheet.create({
     minHeight: 520,
   },
   cardTitle: {
-    color: COLORS.text,
+    color: COLORS.text2,
     fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 36,
   },
   label: {
-    color: COLORS.text,
+    color: COLORS.text2,
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 18,
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   input: {
     borderBottomWidth: 1,
     borderBottomColor: COLORS.inputBorder,
-    color: COLORS.text,
+    color: COLORS.text2,
     fontSize: 16,
     paddingVertical: 12,
     marginBottom: 18,
