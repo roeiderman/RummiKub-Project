@@ -40,8 +40,6 @@ export default function HomeScreen() {
 
       result = await ImagePicker.launchCameraAsync({
       quality: 0.8,
-      allowsEditing: true, // Forces the user to crop the photo
-      aspect: [1, 1],      // Forces a perfect square!
       });
 
     } else {
@@ -53,7 +51,7 @@ export default function HomeScreen() {
       }
       
       result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Only allow images, no videos
+        mediaTypes: ['images'], 
         quality: 0.8,
       });
     }

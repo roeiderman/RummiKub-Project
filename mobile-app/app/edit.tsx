@@ -4,7 +4,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { EDITOR_THEME } from '../src/constants/colors';
 import { findOptimalMove } from '../src/services/optimizeService';
 import { recordTurn } from '../src/services/leaderboardService';
-import { DetectionResponse } from '../src/types/tile';
+import { DetectionResponse, TileData, RummikubTile } from '../src/types/tile';
 
 export default function EditChooserScreen() {
   const router = useRouter();
@@ -26,6 +26,11 @@ export default function EditChooserScreen() {
   );
 
   const canFindBestMove = visitedBoard && visitedRack;
+
+  const sanitizeTile = (tile: TileData): RummikubTile => {
+    const { position, size, corners, rotation_degrees, confidence, ...cleanTile } = tile;
+    return cleanTile;
+  };
 
   const handleFindBestMove = async () => {
     try {
@@ -74,8 +79,13 @@ export default function EditChooserScreen() {
         return;
       }
 
+      const cleanGroups: RummikubTile[][] = groups.map(group => group.map(sanitizeTile));
+  
+      // Clean the 1D array of the rack
+      const cleanRack: RummikubTile[] = rack.map(sanitizeTile);
+
       // Call optimize API
-      const result = await findOptimalMove(groups, rack);
+      const result = await findOptimalMove(cleanGroups, cleanRack);
 
       // Show results
       const optimizeData = result.data as any;
@@ -92,29 +102,20 @@ export default function EditChooserScreen() {
       } else {
         const tilesUsed: number = optimizeData.tilesUsed ?? 0;
 
-        // Record turn in leaderboard — increments totalTurns and updates maxTilesInOneTurn if new best
+        // Record turn in leaderboard
         recordTurn(tilesUsed).catch(() => {});
 
-        Alert.alert(
-          'Optimal Move Found!',
-          //`${moveDescription}\n\nTiles to play: ${tilesUsedText}\n\nTiles played: ${tilesPlayed}`,
-          (''),
-          [
-            {
-              text: 'View Details',
-              onPress: () => {
-                console.log('=== OPTIMAL MOVE DETAILS ===');
-                console.log(JSON.stringify(result.data, null, 2));
-                console.log('============================');
-              },
-            },
-            { text: 'OK' },
-            {
-              text: 'Upload New Images',
-              onPress: () => router.replace('/home'),
-            },
-          ]
-        );
+        // 🚀 INSTANTLY navigate to the solution screen
+        router.push({
+          pathname: '/solution-screen', // Make sure this matches your file name exactly
+          params: {
+            moves: JSON.stringify(optimizeData.moves),
+            // CRITICAL: Pass the starting arrays so the screen knows where the tiles begin!
+            boardGroups: JSON.stringify(cleanGroups), 
+            rackTiles: JSON.stringify(cleanRack),
+            finalBoard: JSON.stringify(optimizeData.finalBoard)
+          }
+        });
       }
     } catch (error: any) {
       // Handle board validation errors specially
@@ -185,40 +186,6 @@ export default function EditChooserScreen() {
         <TouchableOpacity
           style={[
             styles.button,
-            !visitedBoard && styles.buttonUnvisited,
-            visitedBoard && styles.buttonVisited
-          ]}
-          onPress={() =>
-            router.push({
-              pathname: '/edit-board',
-              params: {
-                boardGroups: params.boardGroups,
-                rackTiles: params.rackTiles,
-                rackVisited: visitedRack ? 'true' : undefined,
-              },
-            })
-          }
-          activeOpacity={0.7}
-        >
-          {visitedBoard && (
-            <View style={styles.checkmarkBadge}>
-              <Text style={styles.checkmarkText}>✓</Text>
-            </View>
-          )}
-          {!visitedBoard && (
-            <View style={styles.requiredBadge}>
-              <Text style={styles.requiredText}>!</Text>
-            </View>
-          )}
-          <Text style={styles.buttonText}>Edit Board</Text>
-          <Text style={styles.buttonSubtext}>
-            {visitedBoard ? 'Reviewed' : 'Required - Tap to review'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.button,
             !visitedRack && styles.buttonUnvisited,
             visitedRack && styles.buttonVisited
           ]}
@@ -247,6 +214,40 @@ export default function EditChooserScreen() {
           <Text style={styles.buttonText}>Edit Rack</Text>
           <Text style={styles.buttonSubtext}>
             {visitedRack ? 'Reviewed' : 'Required - Tap to review'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            !visitedBoard && styles.buttonUnvisited,
+            visitedBoard && styles.buttonVisited
+          ]}
+          onPress={() =>
+            router.push({
+              pathname: '/edit-board',
+              params: {
+                boardGroups: params.boardGroups,
+                rackTiles: params.rackTiles,
+                rackVisited: visitedRack ? 'true' : undefined,
+              },
+            })
+          }
+          activeOpacity={0.7}
+        >
+          {visitedBoard && (
+            <View style={styles.checkmarkBadge}>
+              <Text style={styles.checkmarkText}>✓</Text>
+            </View>
+          )}
+          {!visitedBoard && (
+            <View style={styles.requiredBadge}>
+              <Text style={styles.requiredText}>!</Text>
+            </View>
+          )}
+          <Text style={styles.buttonText}>Edit Board</Text>
+          <Text style={styles.buttonSubtext}>
+            {visitedBoard ? 'Reviewed' : 'Required - Tap to review'}
           </Text>
         </TouchableOpacity>
       </View>
