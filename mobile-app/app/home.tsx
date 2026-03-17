@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { StyleSheet, View, Text, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 // Ionicons comes pre-installed with Expo!
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+import LoadingScreen from '../components/LoadingScreen';
 import { uploadImageForDetection } from '../src/services/detectionService';
 
 export default function HomeScreen() {
@@ -103,6 +104,10 @@ export default function HomeScreen() {
 
   const isReady = rackImage && boardImage;
 
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Start Your Move</Text>
@@ -139,11 +144,7 @@ export default function HomeScreen() {
         disabled={!isReady || isLoading}
         onPress={handleContinue}
       >
-        {isLoading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Continue to Analyze</Text>
-        )}
+        <Text style={styles.buttonText}>Continue to Analyze</Text>
       </TouchableOpacity>
     </View>
   );
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
   placeholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   cardText: { marginTop: 10, color: '#666', fontWeight: '500' },
   preview: { width: '100%', height: '100%' },
-  continueButton: { backgroundColor: '#007AFF', padding: 18, borderRadius: 12, alignItems: 'center' },
+  continueButton: { backgroundColor: 'rgb(138, 192, 133)', padding: 18, borderRadius: 12, alignItems: 'center' },
   disabledButton: { backgroundColor: '#ccc' },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' }
 });

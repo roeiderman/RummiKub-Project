@@ -1,11 +1,12 @@
 export const COLORS = {
-  background: '#120f35',
-  card: '#171240',
-  primary: '#5f67ff',
+  background: '#afdbb1',
+  card: '#daf0db',
+  primary: 'rgb(138, 192, 133)',
   text: '#ffffff',
+  text2: '#1c1a1c',
   mutedText: '#b5b0d6',
   inputBorder: '#4b4674',
-  link: '#7b7af7',
+  link: '#60bf65',
 };
 
 export const TILE_COLORS = {

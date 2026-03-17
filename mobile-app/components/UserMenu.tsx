@@ -99,7 +99,7 @@ export default function UserMenu() {
               activeOpacity={0.85}
               onPress={() => { setMenuVisible(false); router.push('/leaderboard'); }}
             >
-              <Ionicons name="trophy-outline" size={18} color="#5f67ff" />
+              <Ionicons name="trophy-outline" size={18} color="rgb(138, 192, 133)" />
               <Text style={styles.leaderboardText}>Leaderboard</Text>
             </TouchableOpacity>
 
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#5f67ff',
+    backgroundColor: 'rgb(138, 192, 133)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#5f67ff',
+    borderColor: 'rgb(138, 192, 133)',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -197,14 +197,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   leaderboardText: {
-    color: '#5f67ff',
+    color: 'rgb(138, 192, 133)',
     fontSize: 15,
     fontWeight: '700',
   },
   logoutButton: {
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#D84B4B',
+    backgroundColor: 'rgb(50, 209, 36)',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
