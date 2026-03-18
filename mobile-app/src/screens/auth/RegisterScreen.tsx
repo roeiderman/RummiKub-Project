@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   input: {
     borderBottomWidth: 1,
     borderBottomColor: COLORS.inputBorder,
-    color: COLORS.text,
+    color: COLORS.signUpText,
     fontSize: 16,
     paddingVertical: 12,
     marginBottom: 18,

@@ -97,7 +97,7 @@ export default function UserMenu() {
             <TouchableOpacity
               style={styles.leaderboardButton}
               activeOpacity={0.85}
-              onPress={() => { setMenuVisible(false); router.push('/leaderboard'); }}
+              onPress={() => { setMenuVisible(false); if (pathname !== '/leaderboard') router.push('/leaderboard'); }}
             >
               <Ionicons name="trophy-outline" size={18} color="rgb(138, 192, 133)" />
               <Text style={styles.leaderboardText}>Leaderboard</Text>

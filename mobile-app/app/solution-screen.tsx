@@ -71,6 +71,11 @@ export default function AnimatedSolutionScreen() {
   const [visualNewBoard, setVisualNewBoard] = useState<RummikubTile[][]>([]);
   const [visualRack, setVisualRack] = useState<RummikubTile[]>(initialRack);
   const [completionModalVisible, setCompletionModalVisible] = useState(false);
+  const [history, setHistory] = useState<Array<{
+    board: RummikubTile[][];
+    newBoard: RummikubTile[][];
+    rack: RummikubTile[];
+  }>>([]);
 
   const currentMove = currentStepIndex < moves.length ? moves[currentStepIndex] : null;
   const activeTileKeys = currentMove ? currentMove.tiles.map(getTileKey) : [];
@@ -121,6 +126,8 @@ export default function AnimatedSolutionScreen() {
       return;
     }
 
+    setHistory(prev => [...prev, { board: visualBoard, newBoard: visualNewBoard, rack: visualRack }]);
+
     const { newBoard, newNewBoard, newRack } = applyMoveToState(
       currentMove,
       visualBoard,
@@ -128,12 +135,21 @@ export default function AnimatedSolutionScreen() {
       visualRack
     );
 
-    const nextStepIndex = currentStepIndex + 1;
-
     setVisualBoard(newBoard);
     setVisualNewBoard(newNewBoard);
     setVisualRack(newRack);
-    setCurrentStepIndex(nextStepIndex);
+    setCurrentStepIndex(currentStepIndex + 1);
+  };
+
+  const handlePrevStep = () => {
+    if (history.length === 0) return;
+
+    const prev = history[history.length - 1];
+    setHistory(h => h.slice(0, -1));
+    setVisualBoard(prev.board);
+    setVisualNewBoard(prev.newBoard);
+    setVisualRack(prev.rack);
+    setCurrentStepIndex(currentStepIndex - 1);
   };
 
   const handleContinueCapturing = () => {
@@ -239,9 +255,10 @@ export default function AnimatedSolutionScreen() {
       <View style={styles.navigateButtonsSection}>
         {/* Left Button */}
         <TouchableOpacity
-          style={styles.bottomStepArrow}
+          style={[styles.bottomStepArrow, history.length === 0 && styles.bottomStepArrowDisabled]}
           activeOpacity={0.85}
-          disabled={currentMove === null}
+          onPress={handlePrevStep}
+          disabled={history.length === 0}
         >
           <Text style={styles.bottomStepArrowText}>{'<-'}</Text>
         </TouchableOpacity>
@@ -496,6 +513,9 @@ boardContent: {
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+  },
+  bottomStepArrowDisabled: {
+    backgroundColor: '#a0c4f1',
   },
   bottomStepArrowText: {
     color: '#ffffff',
