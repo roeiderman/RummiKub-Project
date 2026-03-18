@@ -4,12 +4,13 @@ import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanim
 import { useLocalSearchParams } from 'expo-router';
 import { RummikubTile, RummikubMove } from '../src/types/tile'
 import { TILE_COLORS } from '../src/constants/colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ADD THIS HELPER FUNCTION
 export const getTileKey = (tile: RummikubTile) => `${tile._source}_${tile.id}`;
 
 export const applyMoveToState = (
-  move: RummikubMove, 
+  move: RummikubMove,
   currentBoard: RummikubTile[][], 
   currentRack: RummikubTile[]
 ) => {
@@ -31,6 +32,7 @@ export const applyMoveToState = (
 
 export default function AnimatedSolutionScreen() {
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   
   const safeParse = (data: any) => {
     try { return JSON.parse(data as string); } 
@@ -58,7 +60,7 @@ export default function AnimatedSolutionScreen() {
   // 1. IDENTIFY ACTIVE TILES USING THE COMPOSITE KEY
   const currentMove = currentStepIndex < moves.length ? moves[currentStepIndex] : null;
   const activeTileKeys = currentMove ? currentMove.tiles.map(getTileKey) : [];
-
+ 
   const AnimatedTile = ({ tile, isActive }: { tile: RummikubTile; isActive: boolean }) => {
     const tileStateStyle = !currentMove 
       ? null 
@@ -92,8 +94,8 @@ export default function AnimatedSolutionScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.boardArea}>
+    <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+      <ScrollView style={styles.boardArea} contentContainerStyle={styles.boardContent}>
         {visualBoard.map((group, groupIndex) => (
           <Animated.View 
             key={`group-${groupIndex}`} 
@@ -104,7 +106,7 @@ export default function AnimatedSolutionScreen() {
               <AnimatedTile 
                 // CRITICAL: Use the unique composite key for the React Key!
                 key={getTileKey(tile)} 
-                tile={tile} 
+                tile={tile}
                 isActive={activeTileKeys.includes(getTileKey(tile))}
               />
             ))}
@@ -159,21 +161,19 @@ const styles = StyleSheet.create({
     flex: 1, // Takes up the remaining vertical space
     marginBottom: 16,
   },
+  boardContent: {
+    flexDirection: 'row', // Aligns groups horizontally
+    flexWrap: 'wrap',     // Forces groups to wrap to the next line if they don't fit
+    alignItems: 'flex-start',
+    gap: 12,              // Creates the "grid" spacing between groups
+    paddingBottom: 20,    // Adds a little padding at the very bottom of the scroll
+  },
   groupContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    backgroundColor: '#ffffff',
-    padding: 12,
+    padding: 3,
     borderRadius: 12,
-    marginBottom: 12,
-    gap: 6,
-    // Soft shadow to make the groups look like they are sitting on a table
-    shadowColor: '#000', 
-    shadowOpacity: 0.08, 
-    shadowRadius: 3, 
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
+    margin: 3,
   },
 
   // --- MIDDLE: INSTRUCTION AREA ---
