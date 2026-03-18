@@ -5,7 +5,6 @@ import LottieView from 'lottie-react-native';
 const STATUS_MESSAGES = [
   'Scanning tiles...',
   'Analyzing board...',
-  'Finding the best move...',
 ];
 
 export default function LoadingScreen() {

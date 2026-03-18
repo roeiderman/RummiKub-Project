@@ -24,6 +24,7 @@ export default function RootLayout() {
         <Stack.Screen name="edit" />
         <Stack.Screen name="edit-board" />
         <Stack.Screen name="edit-rack" />
+        <Stack.Screen name="solution-screen" />
         <Stack.Screen name="leaderboard" />
       </Stack>
       <UserMenu />

@@ -79,11 +79,11 @@ export default function HomeScreen() {
         return;
       }
       
-      // Send the Rack (groupFlag = false)
-      const rackData = await uploadImageForDetection(rackImage, false, accessToken);
-
-      // Send the Board (groupFlag = true)
-      const boardData = await uploadImageForDetection(boardImage, true, accessToken);
+      const [rackData, boardData] = await Promise.all([
+        uploadImageForDetection(rackImage, false, accessToken),
+        uploadImageForDetection(boardImage, true, accessToken)
+      ]);
+      
       
       // 3. Navigate to the Correction screen with BOTH sets of results
       // 4. USE ROUTER.PUSH AND STRINGIFY THE DATA
