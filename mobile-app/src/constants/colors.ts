@@ -7,6 +7,7 @@ export const COLORS = {
   mutedText: '#b5b0d6',
   inputBorder: '#4b4674',
   link: '#60bf65',
+  signUpText: '#000000',
 };
 
 export const TILE_COLORS = {
