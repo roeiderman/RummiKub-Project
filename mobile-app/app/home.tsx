@@ -4,9 +4,9 @@ import { StyleSheet, View, Text, TouchableOpacity, Image, Alert } from 'react-na
 import * as ImagePicker from 'expo-image-picker';
 // Ionicons comes pre-installed with Expo!
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
 import LoadingScreen from '../components/LoadingScreen';
 import { uploadImageForDetection } from '../src/services/detectionService';
+import { SessionExpiredError } from '../src/services/apiClient';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -70,20 +70,12 @@ export default function HomeScreen() {
 
     setIsLoading(true);
     try {
-      // 1. PULL THE TOKEN FROM THE VAULT
-      const accessToken = await SecureStore.getItemAsync('accessToken');
-      
-      if (!accessToken) {
-        Alert.alert('Authentication Error', 'You must be logged in to analyze tiles.');
-        // TODO: Optionally redirect them back to the Login screen here
-        return;
-      }
       
       const [rackData, boardData] = await Promise.all([
-        uploadImageForDetection(rackImage, false, accessToken),
-        uploadImageForDetection(boardImage, true, accessToken)
+        uploadImageForDetection(rackImage, false),
+        uploadImageForDetection(boardImage, true)
       ]);
-      
+
       
       // 3. Navigate to the Correction screen with BOTH sets of results
       // 4. USE ROUTER.PUSH AND STRINGIFY THE DATA
@@ -96,7 +88,9 @@ export default function HomeScreen() {
       });
 
     } catch (error: any) {
-      Alert.alert('Analysis Failed', error.message);
+      if (!(error instanceof SessionExpiredError)) {
+        Alert.alert('Analysis Failed', error.message);
+      }
     } finally {
       setIsLoading(false);
     }

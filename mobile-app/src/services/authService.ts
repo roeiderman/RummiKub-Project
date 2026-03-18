@@ -1,4 +1,5 @@
 import { clearSession, SessionUser, storeSessionTokens, storeSessionUser } from './sessionService';
+import { apiFetch } from './apiClient';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 
 type LoginPayload = {
@@ -21,11 +22,12 @@ export async function loginUser(payload: LoginPayload) {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
-
   if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
     throw new Error(data.error?.message || data.message || 'Login failed');
   }
+
+  const data = await response.json();
 
   await storeSessionTokens(data.data?.accessToken, data.data?.refreshToken);
   await storeSessionUser(data.data?.user as SessionUser | undefined);
@@ -42,15 +44,19 @@ export async function registerUser(payload: RegisterPayload) {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
-
   if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
     throw new Error(data.error?.message || data.message || 'Registration failed');
   }
 
-  return data;
+  return response.json();
 }
 
 export async function logoutUser() {
+  try {
+    await apiFetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST' });
+  } catch {
+    // Ignore errors — clear local session regardless
+  }
   await clearSession();
 }

@@ -1,12 +1,23 @@
-import React, { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { LogBox } from 'react-native';
+import { LogBox, View, Text, StyleSheet } from 'react-native';
 import UserMenu from '../components/UserMenu';
+import { setSessionExpiredHandler } from '../src/services/apiClient';
 
 export default function RootLayout() {
+  const router = useRouter();
+  const [sessionExpiredVisible, setSessionExpiredVisible] = useState(false);
+
   useEffect(() => {
-    // Suppress reanimated warnings about .value in inline styles
+    setSessionExpiredHandler(() => {
+      setSessionExpiredVisible(true);
+      setTimeout(() => {
+        setSessionExpiredVisible(false);
+        router.replace('/');
+      }, 2500);
+    });
+
     LogBox.ignoreLogs([
       'It looks like you might be using shared value\'s .value inside reanimated inline style',
     ]);
@@ -28,7 +39,34 @@ export default function RootLayout() {
         <Stack.Screen name="leaderboard" />
       </Stack>
       <UserMenu />
+      {sessionExpiredVisible && (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>
+            Session expired. Redirecting to login...
+          </Text>
+        </View>
+      )}
       <StatusBar style="light" />
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  banner: {
+    position: 'absolute',
+    bottom: 60,
+    left: 20,
+    right: 20,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  bannerText: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+});

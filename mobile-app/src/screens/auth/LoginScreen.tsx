@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,17 +6,76 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter  } from 'expo-router';
 import { COLORS } from '../../constants/colors';
 import { loginUser } from '../../services/authService';
+import { getAccessToken, getRefreshToken, storeSessionTokens } from '../../services/sessionService';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
+
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+
   const router = useRouter();
+
+  useEffect(() => {
+    async function checkExistingSession() {
+      try {
+        const accessToken = await getAccessToken();
+
+        if (accessToken && !isTokenExpired(accessToken)) {
+          router.replace('/home');
+          return;
+        }
+
+        const refreshToken = await getRefreshToken();
+        if (!refreshToken) {
+          setIsCheckingSession(false);
+          return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          await storeSessionTokens(data.data.accessToken, undefined);
+          router.replace('/home');
+        } else {
+          setIsCheckingSession(false);
+        }
+      } catch {
+        setIsCheckingSession(false);
+      }
+    }
+
+    checkExistingSession();
+  }, []);
+
+  if (isCheckingSession) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </SafeAreaView>
+    );
+  }
 
   const handleSignIn = async () => {
     // Client-side validation for instant feedback

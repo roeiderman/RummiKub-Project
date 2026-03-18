@@ -33,6 +33,10 @@ export async function getAccessToken() {
   return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
 }
 
+export async function getRefreshToken() {
+  return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+}
+
 export async function getSessionUser() {
   const rawUser = await SecureStore.getItemAsync(USER_KEY);
 

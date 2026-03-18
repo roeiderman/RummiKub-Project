@@ -5,6 +5,7 @@ import { EDITOR_THEME } from '../src/constants/colors';
 import { findOptimalMove } from '../src/services/optimizeService';
 import { recordTurn } from '../src/services/leaderboardService';
 import { DetectionResponse, TileData, RummikubTile } from '../src/types/tile';
+import { SessionExpiredError } from '../src/services/apiClient';
 
 export default function EditChooserScreen() {
   const router = useRouter();
@@ -118,6 +119,9 @@ export default function EditChooserScreen() {
         });
       }
     } catch (error: any) {
+      if (error instanceof SessionExpiredError) {
+        return; // _onSessionExpired handler already redirected to login
+      }
       // Handle board validation errors specially
       if (error.type === 'BoardInvalidError' && error.invalidGroups) {
         setIsOptimizing(false); // Stop loading for the alert
