@@ -4,6 +4,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  ScrollViewComponent,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -16,6 +17,7 @@ import { RummikubMove, RummikubTile } from '../src/types/tile';
 
 const JOKER_RED = require('../assets/images/joker-red.png');
 const JOKER_BLACK = require('../assets/images/joker-black.png');
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const getTileKey = (tile: RummikubTile) => `${tile._source}_${tile.id}`;
 
@@ -45,6 +47,7 @@ export const applyMoveToState = (
 export default function AnimatedSolutionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const safeParse = (data: unknown) => {
     try {
@@ -159,40 +162,13 @@ export default function AnimatedSolutionScreen() {
           </View>
         ) : null}
 
-        <View style={styles.boardSection}>
+        <View style={styles.tilesSection}>
           <Text style={styles.sectionTitle}>New Board</Text>
-          {visualNewBoard.length > 0 ? (
-            visualNewBoard.map((group, groupIndex) => (
-              <Animated.View
-                key={`new-group-${groupIndex}`}
-                layout={LinearTransition}
-                style={styles.groupContainer}
-              >
-                {group.map(tile => (
-                  <AnimatedTile
-                    key={getTileKey(tile)}
-                    tile={tile}
-                    isActive={activeTileKeys.includes(getTileKey(tile))}
-                  />
-                ))}
-              </Animated.View>
-            ))
-          ) : (
-            <View style={styles.emptyBoardState}>
-              <Text style={styles.emptyBoardText}>
-                New groups will appear here as you animate the solution.
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.rackArea}>
-          <Text style={styles.rackTitle}>Board</Text>
-          <View style={styles.boardSummaryContainer}>
-            {visualBoard.length > 0 ? (
-              visualBoard.map((group, groupIndex) => (
+          <View style={styles.boardGrid}>
+            {visualNewBoard.length > 0 ? (
+              visualNewBoard.map((group, groupIndex) => (
                 <Animated.View
-                  key={`original-group-${groupIndex}`}
+                  key={`new-group-${groupIndex}`}
                   layout={LinearTransition}
                   style={styles.groupContainer}
                 >
@@ -206,21 +182,33 @@ export default function AnimatedSolutionScreen() {
                 </Animated.View>
               ))
             ) : (
-              <View style={styles.emptyBottomState}>
-                <Text style={styles.emptyBoardText}>No tiles are left on your previous board.</Text>
+              <View style={styles.emptyBoardState}>
+                <Text style={styles.emptyBoardText}>
+                  New groups will appear here as you animate the solution.
+                </Text>
               </View>
             )}
           </View>
+        </View>
 
-          <Text style={styles.rackTitle}>Your Rack</Text>
-          <View style={styles.rackContainer}>
-            {visualRack.map(tile => (
-              <AnimatedTile
-                key={getTileKey(tile)}
-                tile={tile}
-                isActive={activeTileKeys.includes(getTileKey(tile))}
-              />
-            ))}
+        <View style={styles.tilesSection}>
+          <Text style={styles.rackTitle}>Board</Text>
+          <View style={styles.boardGrid}>
+              {visualBoard.map((group, groupIndex) => (
+                <Animated.View
+                  key={`original-group-${groupIndex}`}
+                  layout={LinearTransition}
+                  style={styles.groupContainer}
+                >
+                  {group.map(tile => (
+                    <AnimatedTile
+                      key={getTileKey(tile)}
+                      tile={tile}
+                      isActive={activeTileKeys.includes(getTileKey(tile))}
+                    />
+                  ))}
+                </Animated.View>
+              ))}
           </View>
 
           {!currentMove && !completionModalVisible ? (
@@ -233,19 +221,41 @@ export default function AnimatedSolutionScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-
-        {currentMove ? (
-          <View style={styles.bottomArrowRow}>
-            <TouchableOpacity
-              style={styles.bottomStepArrow}
-              activeOpacity={0.85}
-              onPress={handleNextStep}
-            >
-              <Text style={styles.bottomStepArrowText}>{'>'}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
       </ScrollView>
+
+      <View style={styles.tilesSection}>
+        <Text style={styles.rackTitle}>Your Rack</Text>
+        <View style={styles.rackContainer}>
+          {visualRack.map(tile => (
+            <AnimatedTile
+              key={getTileKey(tile)}
+              tile={tile}
+              isActive={activeTileKeys.includes(getTileKey(tile))}
+            />
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.navigateButtonsSection}>
+        {/* Left Button */}
+        <TouchableOpacity
+          style={styles.bottomStepArrow}
+          activeOpacity={0.85}
+          disabled={currentMove === null}
+        >
+          <Text style={styles.bottomStepArrowText}>{'<-'}</Text>
+        </TouchableOpacity>
+
+        {/* Right Button */}
+        <TouchableOpacity
+          style={styles.bottomStepArrow}
+          activeOpacity={0.85}
+          onPress={handleNextStep}
+          disabled={currentMove === null}
+        >
+          <Text style={styles.bottomStepArrowText}>{'->'}</Text>
+        </TouchableOpacity>
+      </View>
 
       <Modal
         animationType="fade"
@@ -309,37 +319,43 @@ const styles = StyleSheet.create({
     borderColor: '#dbe4ee',
     marginBottom: 16,
   },
-  boardSection: {
+  tilesSection: { 
     backgroundColor: '#e9ecef',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#dee2e6',
     marginBottom: 16,
+    marginTop: 16,
+  }, 
+boardContent: {
+    flexDirection: 'row', // Aligns groups horizontally
+    flexWrap: 'wrap',     // Forces groups to wrap to the next line if they don't fit
+    alignItems: 'flex-start',
+    gap: 12,              // Creates the "grid" spacing between groups
+    paddingBottom: 20,    // Adds a little padding at the very bottom of the scroll
+  },
+  boardGrid: {
+    flex: 1,                   // Takes up the remaining vertical space
+    flexDirection: 'row',      // Aligns groups horizontally
+    flexWrap: 'wrap',          // Forces groups to wrap to the next line
+    alignItems: 'flex-start',  // Aligns items at the top of their current row
+    alignContent: 'flex-start',// 🚀 CRITICAL: Packs all the wrapped rows tightly to the top
+    gap: 12,                   // Spacing between groups
+    marginBottom: 16,
   },
   groupContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    backgroundColor: '#ffffff',
-    padding: 12,
+    padding: 3,
     borderRadius: 12,
     marginBottom: 12,
-    gap: 6,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 3,
     elevation: 2,
     borderWidth: 1,
     borderColor: '#e9ecef',
-  },
-  rackArea: {
-    backgroundColor: '#e9ecef',
-    padding: 16,
-    borderRadius: 16,
-    minHeight: 120,
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    marginBottom: 16,
   },
   rackTitle: {
     fontSize: 15,
@@ -361,7 +377,6 @@ const styles = StyleSheet.create({
   rackContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
     justifyContent: 'center',
   },
   stepCounter: {
@@ -391,7 +406,6 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1,
     borderColor: '#dbe4ee',
-    marginTop: 14,
   },
   completeButtonText: {
     fontSize: 20,
@@ -465,22 +479,23 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.05 }],
     zIndex: 10,
   },
-  bottomArrowRow: {
-    width: '100%',
-    alignItems: 'flex-end',
+  navigateButtonsSection: {
+    flexDirection: 'row', // Places buttons side-by-side
+    gap: 12,              // Space between the buttons
+    marginTop: 4,         // Adds a tiny bit of breathing room below the rack
+    paddingBottom: 16,
   },
   bottomStepArrow: {
-    width: 52,
+    flex: 1,              // 🚀 FORCES BUTTONS TO GROW AND SPLIT THE WIDTH 50/50
     height: 52,
     borderRadius: 26,
     backgroundColor: '#007AFF',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
-    marginBottom: 8,
   },
   bottomStepArrowText: {
     color: '#ffffff',
