@@ -7,6 +7,7 @@ require('dotenv').config(); // <--- ADDED: Load environment variables
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 // Get Python path from .env or default to 'python'
 const PYTHON_EXECUTABLE = process.env.PYTHON_PATH || 'python';
@@ -26,9 +27,12 @@ async function detectTiles(image, options = {}) {
         let inputPath;
         let tempImageFile = false;
 
+        // CREATE A UNIQUE ID FOR THIS SPECIFIC REQUEST
+        const uniqueId = crypto.randomBytes(8).toString('hex');
+
         // 1. PREPARE IMAGE
         if (Buffer.isBuffer(image)) {
-            inputPath = path.join(__dirname, 'temp_image.jpg');
+            inputPath = path.join(__dirname, `temp_image_${uniqueId}.jpg`);
             fs.writeFileSync(inputPath, image);
             tempImageFile = true;
         } else if (typeof image === 'string') {
@@ -42,7 +46,7 @@ async function detectTiles(image, options = {}) {
 
         console.log(`Applying model to: ${inputPath}`);
 
-        const jsonOutputPath = path.join(__dirname, 'temp_detections.json');
+        const jsonOutputPath = path.join(__dirname, `temp_detections_${uniqueId}.json`);
         const absoluteImagePath = path.resolve(inputPath);
         const modelDir = path.join(__dirname, '..', '..', 'model');
         
@@ -152,7 +156,8 @@ async function saveAnnotatedImage(image) {
 
         if (Buffer.isBuffer(image)) {
             // If buffer, save to temp file
-            inputPath = path.join(__dirname, 'temp_image_annotate.jpg');
+            const uniqueId = crypto.randomBytes(8).toString('hex');
+            inputPath = path.join(__dirname, `temp_image_annotate_${uniqueId}.jpg`);
             fs.writeFileSync(inputPath, image);
             tempImageFile = true;
         } else if (typeof image === 'string') {
