@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { logoutUser } from '../src/services/authService';
 import { SessionUser, getSessionUser } from '../src/services/sessionService';
 
-const AUTHENTICATED_ROUTES = new Set(['/home', '/edit', '/edit-board', '/edit-rack', '/leaderboard']);
+const AUTHENTICATED_ROUTES = new Set(['/home', '/edit', '/edit-board', '/edit-rack', '/solution-screen', '/leaderboard']);
 
 export default function UserMenu() {
   const pathname = usePathname();
@@ -128,7 +128,7 @@ export default function UserMenu() {
 const styles = StyleSheet.create({
   anchor: {
     position: 'absolute',
-    top: 58,
+    top: 44,
     right: 18,
     zIndex: 100,
   },
