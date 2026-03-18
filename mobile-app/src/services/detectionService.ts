@@ -1,8 +1,9 @@
 import * as ImageManipulator from 'expo-image-manipulator';
+import { apiFetch, SessionExpiredError } from './apiClient';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 
-export const uploadImageForDetection = async (imageUri: string, groupFlag: boolean, token: string) => {
+export const uploadImageForDetection = async (imageUri: string, groupFlag: boolean) => {
   try {
     let processedUri = imageUri;
 
@@ -34,12 +35,9 @@ export const uploadImageForDetection = async (imageUri: string, groupFlag: boole
     } as any);
 
     // Send to Node.js backend
-    const response = await fetch(`${API_BASE_URL}/api/detection`, {
+    // Don't set Content-Type manually - let FormData set it with boundary
+    const response = await apiFetch(`${API_BASE_URL}/api/detection`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        // Don't set Content-Type manually - let FormData set it with boundary
-      },
       body: formData,
     });
 
@@ -52,7 +50,9 @@ export const uploadImageForDetection = async (imageUri: string, groupFlag: boole
     return data;
 
   } catch (error) {
-    console.error(`API Upload Error (groupFlag: ${groupFlag}):`, error);
+    if (!(error instanceof SessionExpiredError)) {
+      console.error(`API Upload Error (groupFlag: ${groupFlag}):`, error);
+    }
     throw error;
   }
 };

@@ -82,7 +82,7 @@ function classifyGroup(attribution, initialBoard) {
 
 /** Returns a display name for a tile */
 function tileName(tile) {
-    return isJoker(tile) ? 'Joker' : `${tile.color}_${tile.number}`;
+    return isJoker(tile) ? 'Joker' : `${tile.color} ${tile.number}`;
 }
 
 /** Joins an array of strings naturally: "A", "A and B", "A, B, and C" */

@@ -1,5 +1,5 @@
-import * as SecureStore from 'expo-secure-store';
 import { RummikubTile, OptimizeResponse } from '../types/tile';
+import { apiFetch } from './apiClient';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 
@@ -8,18 +8,9 @@ export const findOptimalMove = async (
   rack: RummikubTile[]
 ): Promise<OptimizeResponse> => {
   try {
-    // Get token from secure storage
-    const token = await SecureStore.getItemAsync('accessToken');
-
-    if (!token) {
-      throw new Error('Authentication token not found. Please log in again.');
-    }
-
-    // Make API request
-    const response = await fetch(`${API_BASE_URL}/api/optimize`, {
+    const response = await apiFetch(`${API_BASE_URL}/api/optimize`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
