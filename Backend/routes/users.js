@@ -13,6 +13,5 @@ router.use(requireAuth);
 // User routes
 router.get('/profile', usersController.getProfile);
 router.put('/profile', usersController.updateProfile);
-router.get('/statistics', usersController.getStatistics);
 
 module.exports = router;
