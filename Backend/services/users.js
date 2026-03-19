@@ -49,24 +49,7 @@ const updateProfile = async (userId, updates) => {
     return user.toJSON();
 };
 
-/**
- * Get user statistics
- */
-const getUserStatistics = async (userId) => {
-    const user = await User.findById(userId);
-
-    if (!user) {
-        const error = new Error('User not found');
-        error.statusCode = 404;
-        error.type = 'NotFoundError';
-        throw error;
-    }
-
-    return user.statistics;
-};
-
 module.exports = {
     getProfile,
-    updateProfile,
-    getUserStatistics
+    updateProfile
 };

@@ -39,25 +39,7 @@ const updateProfile = async (req, res, next) => {
     }
 };
 
-/**
- * Get user statistics
- * GET /api/users/statistics
- */
-const getStatistics = async (req, res, next) => {
-    try {
-        const statistics = await usersService.getUserStatistics(req.userId);
-
-        res.status(200).json({
-            success: true,
-            data: statistics
-        });
-    } catch (error) {
-        next(error);
-    }
-};
-
 module.exports = {
     getProfile,
-    updateProfile,
-    getStatistics
+    updateProfile
 };

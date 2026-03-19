@@ -44,16 +44,6 @@ const userSchema = new mongoose.Schema({
     refreshToken: {
         type: String,
         select: false
-    },
-    statistics: {
-        gamesPlayed: {
-            type: Number,
-            default: 0
-        },
-        totalDetections: {
-            type: Number,
-            default: 0
-        }
     }
 }, {
     timestamps: true

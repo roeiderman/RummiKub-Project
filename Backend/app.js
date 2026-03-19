@@ -69,8 +69,7 @@ app.get('/', (req, res) => {
             },
             users: {
                 profile: 'GET /api/users/profile',
-                updateProfile: 'PUT /api/users/profile',
-                statistics: 'GET /api/users/statistics'
+                updateProfile: 'PUT /api/users/profile'
             },
             detection: {
                 detect: 'POST /api/detection'
