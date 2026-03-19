@@ -59,6 +59,7 @@ async function detectTiles(image, options = {}) {
         ], { cwd: modelDir });
 
         let errorData = '';
+        python.stdout.on('data', (data) => process.stdout.write(data));
         python.stderr.on('data', (data) => errorData += data.toString());
 
         python.on('close', (code) => {
@@ -183,7 +184,7 @@ async function saveAnnotatedImage(image) {
         });
 
         let errorData = '';
-
+        python.stdout.on('data', (data) => process.stdout.write(data));
         python.stderr.on('data', (data) => {
             errorData += data.toString();
         });
