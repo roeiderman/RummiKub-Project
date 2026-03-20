@@ -55,10 +55,10 @@ async function detectTiles(image, options = {}) {
         const absoluteImagePath = path.resolve(inputPath);
         const modelDir = path.join(__dirname, '..', '..', 'model');
         
-        // 2. RUN PYTHON DETECTION
-        const python = spawn(PYTHON_EXECUTABLE, [
-            SCRIPT_NAME, absoluteImagePath, '--json', jsonOutputPath
-        ], { cwd: modelDir });
+        // 2. RUN PYTHON DETECTION (+ annotation in the same call if requested)
+        const spawnArgs = [SCRIPT_NAME, absoluteImagePath, '--json', jsonOutputPath];
+        if (annotate) spawnArgs.push('--save');
+        const python = spawn(PYTHON_EXECUTABLE, spawnArgs, { cwd: modelDir });
 
         let errorData = '';
         python.stdout.on('data', (data) => process.stdout.write(data));
@@ -116,20 +116,27 @@ async function detectTiles(image, options = {}) {
                     detectionId
                 };
 
-                // 3. RUN ANNOTATION (If requested)
+                // 3. FIND ANNOTATED IMAGE (already saved by the single Python call above)
                 if (annotate) {
-                    saveAnnotatedImage(savedImagePath)
-                        .then(annotatedPath => {
-                            normalizedResult.annotatedImagePath = annotatedPath;
-                            resolve(normalizedResult);
-                        })
-                        .catch(err => {
-                            console.error('Warning: Failed to create annotated image:', err.message);
-                            resolve(normalizedResult);
-                        });
-                } else {
-                    resolve(normalizedResult);
+                    try {
+                        const predictDir = path.join(modelDir, 'predict');
+                        if (fs.existsSync(predictDir)) {
+                            const folders = fs.readdirSync(predictDir)
+                                .filter(f => f.startsWith('predict'))
+                                .map(f => ({ path: path.join(predictDir, f), time: fs.statSync(path.join(predictDir, f)).mtime.getTime() }))
+                                .sort((a, b) => b.time - a.time);
+                            if (folders.length > 0) {
+                                const candidate = path.join(folders[0].path, path.basename(absoluteImagePath));
+                                if (fs.existsSync(candidate)) {
+                                    normalizedResult.annotatedImagePath = candidate;
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Warning: Failed to find annotated image:', err.message);
+                    }
                 }
+                resolve(normalizedResult);
             } catch (err) {
                 if (fs.existsSync(jsonOutputPath)) fs.unlinkSync(jsonOutputPath);
                 if (tempImageFile && fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
