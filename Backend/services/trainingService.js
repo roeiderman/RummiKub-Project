@@ -104,7 +104,7 @@ async function recordCorrection({ detectionId, isRack, correctedTiles, imageWidt
     const counter = await CorrectionCounter.findOneAndUpdate(
         {},
         { $inc: { count: 1, fileIndex: 1 } },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
     );
     const fileName = `tile${counter.fileIndex}`;
 
@@ -143,4 +143,25 @@ function deleteTrainingImage(detectionId) {
     }
 }
 
-module.exports = { recordCorrection, getStats, deleteTrainingImage };
+function cleanupAbandonedImages(maxAgeMs = 2 * 60 * 60 * 1000) { // default 2 hours
+    if (!fs.existsSync(TRAINING_IMAGES_DIR)) return;
+
+    const now = Date.now();
+    const files = fs.readdirSync(TRAINING_IMAGES_DIR).filter(f => f.endsWith('.jpg'));
+    let deleted = 0;
+
+    for (const file of files) {
+        const filePath = path.join(TRAINING_IMAGES_DIR, file);
+        const { mtimeMs } = fs.statSync(filePath);
+        if (now - mtimeMs > maxAgeMs) {
+            fs.unlinkSync(filePath);
+            deleted++;
+        }
+    }
+
+    if (deleted > 0) {
+        console.log(`[Training] Cleaned up ${deleted} abandoned image(s) older than ${maxAgeMs / 3600000}h`);
+    }
+}
+
+module.exports = { recordCorrection, getStats, deleteTrainingImage, cleanupAbandonedImages };

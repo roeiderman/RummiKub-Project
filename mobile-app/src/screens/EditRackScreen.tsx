@@ -22,7 +22,7 @@ export default function EditRackScreen() {
         const data: DetectionResponse = JSON.parse(params.rackTiles as string);
         if (data.data.rack) {
           setTiles(data.data.rack);
-          originalTiles.current = data.data.rack;
+          originalTiles.current = data.data.rack.map(t => ({ ...t }));
         }
       }
     } catch (error) {
@@ -121,6 +121,8 @@ export default function EditRackScreen() {
     console.log(JSON.stringify(updatedRackData, null, 2));
     console.log('=========================');
 
+    const changed = tilesChanged(originalTiles.current, tiles);
+
     // Navigate back with visited flag, updated data, and whether edits were made
     router.push({
       pathname: '/edit',
@@ -131,7 +133,7 @@ export default function EditRackScreen() {
         boardVisited: params.boardVisited || undefined,
         rackDetectionId: params.rackDetectionId,
         boardDetectionId: params.boardDetectionId,
-        rackWasEdited: tilesChanged(originalTiles.current, tiles) ? 'true' : 'false',
+        rackWasEdited: changed ? 'true' : 'false',
         boardWasEdited: params.boardWasEdited,
       },
     });

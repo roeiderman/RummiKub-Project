@@ -22,7 +22,7 @@ export default function EditBoardScreen() {
         const data: DetectionResponse = JSON.parse(params.boardGroups as string);
         if (data.data.groups) {
           setGroups(data.data.groups);
-          originalGroups.current = data.data.groups;
+          originalGroups.current = data.data.groups.map(group => group.map(t => ({ ...t })));
         }
       }
     } catch (error) {
