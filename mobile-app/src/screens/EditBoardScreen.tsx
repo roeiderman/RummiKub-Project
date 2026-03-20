@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,8 +13,17 @@ export default function EditBoardScreen() {
   const [groups, setGroups] = useState<TileData[][]>([]);
   const [selectedPos, setSelectedPos] = useState<TilePosition | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const originalGroups = useRef<TileData[][]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const originalBoard = useMemo(() => {
+    try {
+      if (!params.originalBoard) return [];
+      return JSON.parse(params.originalBoard as string).data.groups as TileData[][];
+    } catch (error) {
+      console.error("Failed to parse original history:", error);
+      return [];
+    }
+  }, [params.originalBoard]);
 
   useEffect(() => {
     try {
@@ -22,7 +31,6 @@ export default function EditBoardScreen() {
         const data: DetectionResponse = JSON.parse(params.boardGroups as string);
         if (data.data.groups) {
           setGroups(data.data.groups);
-          originalGroups.current = data.data.groups.map(group => group.map(t => ({ ...t })));
         }
       }
     } catch (error) {
@@ -39,6 +47,10 @@ export default function EditBoardScreen() {
       orig.color !== current[i].color || String(orig.number) !== String(current[i].number)
     );
   };
+
+    useEffect (() => {
+        setHasChanges(tilesChanged(originalBoard.flat(), groups.flat()));
+    }, [groups]);
 
   const handleSelectTile = (pos: TilePosition) => {
     setSelectedPos(pos);
@@ -61,7 +73,6 @@ export default function EditBoardScreen() {
     }
 
     setGroups(newGroups);
-    setHasChanges(true);
   };
 
   const handleColorChange = (color: string) => {
@@ -79,12 +90,10 @@ export default function EditBoardScreen() {
     }
 
     setGroups(newGroups);
-    setHasChanges(true);
   };
 
   const handleSave = () => {
     Alert.alert('Success', 'Board tiles updated successfully!');
-    setHasChanges(false);
   };
 
   const handleBackPress = () => {
@@ -124,7 +133,7 @@ export default function EditBoardScreen() {
     console.log('==========================');
 
     // Navigate back with visited flag, updated data, and whether edits were made
-    router.push({
+    router.navigate({
       pathname: '/edit',
       params: {
         boardGroups: JSON.stringify(updatedBoardData),
@@ -133,8 +142,10 @@ export default function EditBoardScreen() {
         rackVisited: params.rackVisited || undefined,
         boardDetectionId: params.boardDetectionId,
         rackDetectionId: params.rackDetectionId,
-        boardWasEdited: tilesChanged(originalGroups.current.flat(), groups.flat()) ? 'true' : 'false',
+        boardWasEdited: hasChanges ? 'true' : 'false',
         rackWasEdited: params.rackWasEdited,
+        originalTiles: params.originalTiles,
+        originalBoard: params.originalBoard
       },
     });
   };

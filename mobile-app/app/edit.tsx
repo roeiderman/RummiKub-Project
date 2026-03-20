@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { EDITOR_THEME } from '../src/constants/colors';
@@ -14,6 +14,8 @@ export default function EditChooserScreen() {
   const [visitedBoard, setVisitedBoard] = useState(false);
   const [visitedRack, setVisitedRack] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const originalTiles = useRef(params.originalTiles || params.rackTiles);
+  const originalBoard = useRef(params.originalBoard || params.boardGroups);
 
   // Check if user is returning from edit screens
   useFocusEffect(
@@ -234,6 +236,8 @@ export default function EditChooserScreen() {
                 rackDetectionId: params.rackDetectionId,
                 boardDetectionId: params.boardDetectionId,
                 boardWasEdited: params.boardWasEdited,
+                originalTiles: originalTiles.current,
+                originalBoard: originalBoard.current
               },
             })
           }
@@ -271,6 +275,8 @@ export default function EditChooserScreen() {
                 boardDetectionId: params.boardDetectionId,
                 rackDetectionId: params.rackDetectionId,
                 rackWasEdited: params.rackWasEdited,
+                originalTiles: originalTiles.current,
+                originalBoard: originalBoard.current
               },
             })
           }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, use} from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,8 +13,17 @@ export default function EditRackScreen() {
   const [tiles, setTiles] = useState<TileData[]>([]);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const originalTiles = useRef<TileData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const originalTiles = useMemo(() => {
+    try {
+      if (!params.originalTiles) return [];
+      return JSON.parse(params.originalTiles as string).data.rack as TileData[];
+    } catch (error) {
+      console.error("Failed to parse original history:", error);
+      return [];
+    }
+  }, [params.originalTiles]);
 
   useEffect(() => {
     try {
@@ -22,7 +31,6 @@ export default function EditRackScreen() {
         const data: DetectionResponse = JSON.parse(params.rackTiles as string);
         if (data.data.rack) {
           setTiles(data.data.rack);
-          originalTiles.current = data.data.rack.map(t => ({ ...t }));
         }
       }
     } catch (error) {
@@ -32,6 +40,10 @@ export default function EditRackScreen() {
       setIsLoading(false);
     }
   }, [params.rackTiles]);
+
+  useEffect (() => {
+      setHasChanges(tilesChanged(originalTiles, tiles));
+  }, [tiles]);
 
   const tilesChanged = (original: TileData[], current: TileData[]): boolean => {
     if (original.length !== current.length) return true;
@@ -61,7 +73,6 @@ export default function EditRackScreen() {
     }
 
     setTiles(newTiles);
-    setHasChanges(true);
   };
 
   const handleColorChange = (color: string) => {
@@ -79,12 +90,10 @@ export default function EditRackScreen() {
     }
 
     setTiles(newTiles);
-    setHasChanges(true);
   };
 
   const handleSave = () => {
     Alert.alert('Success', 'Rack tiles updated successfully!');
-    setHasChanges(false);
   };
 
   const handleBackPress = () => {
@@ -121,10 +130,8 @@ export default function EditRackScreen() {
     console.log(JSON.stringify(updatedRackData, null, 2));
     console.log('=========================');
 
-    const changed = tilesChanged(originalTiles.current, tiles);
-
     // Navigate back with visited flag, updated data, and whether edits were made
-    router.push({
+    router.navigate({
       pathname: '/edit',
       params: {
         boardGroups: params.boardGroups,
@@ -133,8 +140,10 @@ export default function EditRackScreen() {
         boardVisited: params.boardVisited || undefined,
         rackDetectionId: params.rackDetectionId,
         boardDetectionId: params.boardDetectionId,
-        rackWasEdited: changed ? 'true' : 'false',
+        rackWasEdited: hasChanges ? 'true' : 'false',
         boardWasEdited: params.boardWasEdited,
+        originalTiles: params.originalTiles,
+        originalBoard: params.originalBoard
       },
     });
   };
