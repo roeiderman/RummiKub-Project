@@ -55,33 +55,48 @@ function tilesToYoloOBB(tiles, imageWidth, imageHeight) {
     return lines.join('\n');
 }
 
+// Serialize all HF uploads — prevents concurrent commits causing 412 conflicts
+let uploadQueue = Promise.resolve();
+
 async function uploadToHFDataset(fileName, imagePath, labelContent) {
     if (!HF_DATASET_REPO) throw new Error('HF_DATASET_REPO is not set in .env');
     if (!HF_TOKEN) throw new Error('HF_TOKEN is not set in .env');
 
-    console.log(`[Training] Uploading to HF Dataset (${HF_DATASET_REPO})...`);
-    console.log(`[Training]   images/${fileName}.jpg`);
-    console.log(`[Training]   labels/${fileName}.txt (${labelContent.split('\n').length} tiles)`);
-
     const imageBuffer = fs.readFileSync(imagePath);
 
-    await uploadFiles({
-        repo: { type: 'dataset', name: HF_DATASET_REPO },
-        credentials: { accessToken: HF_TOKEN },
-        files: [
-            {
-                path: `images/${fileName}.jpg`,
-                content: new Blob([imageBuffer], { type: 'image/jpeg' }),
-            },
-            {
-                path: `labels/${fileName}.txt`,
-                content: new Blob([labelContent], { type: 'text/plain' }),
-            },
-        ],
-        commitTitle: `Add ${fileName}`,
+    // Chain onto the queue so uploads never run simultaneously
+    uploadQueue = uploadQueue.then(async () => {
+        console.log(`[Training] Uploading to HF Dataset (${HF_DATASET_REPO})...`);
+        console.log(`[Training]   images/${fileName}.jpg`);
+        console.log(`[Training]   labels/${fileName}.txt (${labelContent.split('\n').length} tiles)`);
+
+        // Retry up to 3 times on 412 commit conflict
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                await uploadFiles({
+                    repo: { type: 'dataset', name: HF_DATASET_REPO },
+                    credentials: { accessToken: HF_TOKEN },
+                    files: [
+                        { path: `images/${fileName}.jpg`, content: new Blob([imageBuffer], { type: 'image/jpeg' }) },
+                        { path: `labels/${fileName}.txt`, content: new Blob([labelContent], { type: 'text/plain' }) },
+                    ],
+                    commitTitle: `Add ${fileName}`,
+                });
+                console.log(`[Training] Upload complete.`);
+                return;
+            } catch (err) {
+                if (err.statusCode === 412 && attempt < 3) {
+                    const delay = attempt * 1000;
+                    console.log(`[Training] Commit conflict, retrying in ${delay}ms (attempt ${attempt}/3)...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    throw err;
+                }
+            }
+        }
     });
 
-    console.log(`[Training] Upload complete.`);
+    await uploadQueue;
 }
 
 async function recordCorrection({ detectionId, isRack, correctedTiles, imageWidth, imageHeight }) {

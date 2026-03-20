@@ -27,10 +27,12 @@ HF_FILENAME = 'rummikub_best.pt'
 def ensure_model():
     """Download model from Hugging Face if not present locally."""
     if not MODEL_PATH.exists():
-        print(f"Model not found locally. Downloading from Hugging Face: {HF_REPO}")
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
         try:
             cached = hf_hub_download(repo_id=HF_REPO, filename=HF_FILENAME, token=HF_TOKEN)
+            if MODEL_PATH.exists():
+                return  # another process already wrote the file while we waited
+            print(f"Downloading model from Hugging Face: {HF_REPO}")
             tmp_path = str(MODEL_PATH) + f'.tmp.{os.getpid()}'
             shutil.copy(cached, tmp_path)
             os.replace(tmp_path, str(MODEL_PATH))
