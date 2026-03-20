@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,7 @@ export default function EditBoardScreen() {
   const [groups, setGroups] = useState<TileData[][]>([]);
   const [selectedPos, setSelectedPos] = useState<TilePosition | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const originalGroups = useRef<TileData[][]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export default function EditBoardScreen() {
         const data: DetectionResponse = JSON.parse(params.boardGroups as string);
         if (data.data.groups) {
           setGroups(data.data.groups);
+          originalGroups.current = data.data.groups;
         }
       }
     } catch (error) {
@@ -30,6 +32,13 @@ export default function EditBoardScreen() {
       setIsLoading(false);
     }
   }, [params.boardGroups]);
+
+  const tilesChanged = (original: TileData[], current: TileData[]): boolean => {
+    if (original.length !== current.length) return true;
+    return original.some((orig, i) =>
+      orig.color !== current[i].color || String(orig.number) !== String(current[i].number)
+    );
+  };
 
   const handleSelectTile = (pos: TilePosition) => {
     setSelectedPos(pos);
@@ -114,7 +123,7 @@ export default function EditBoardScreen() {
     console.log(JSON.stringify(updatedBoardData, null, 2));
     console.log('==========================');
 
-    // Navigate back with visited flag and updated data
+    // Navigate back with visited flag, updated data, and whether edits were made
     router.push({
       pathname: '/edit',
       params: {
@@ -122,6 +131,10 @@ export default function EditBoardScreen() {
         rackTiles: params.rackTiles,
         boardVisited: 'true',
         rackVisited: params.rackVisited || undefined,
+        boardDetectionId: params.boardDetectionId,
+        rackDetectionId: params.rackDetectionId,
+        boardWasEdited: tilesChanged(originalGroups.current.flat(), groups.flat()) ? 'true' : 'false',
+        rackWasEdited: params.rackWasEdited,
       },
     });
   };

@@ -80,10 +80,12 @@ export default function HomeScreen() {
       // 3. Navigate to the Correction screen with BOTH sets of results
       // 4. USE ROUTER.PUSH AND STRINGIFY THE DATA
       router.push({
-        pathname: '/edit', // Ensure you have a file at app/correction.tsx
-        params: { 
+        pathname: '/edit',
+        params: {
           rackTiles: JSON.stringify(rackData),
-          boardGroups: JSON.stringify(boardData)
+          boardGroups: JSON.stringify(boardData),
+          rackDetectionId: rackData.data?.detectionId,
+          boardDetectionId: boardData.data?.detectionId,
         }
       });
 

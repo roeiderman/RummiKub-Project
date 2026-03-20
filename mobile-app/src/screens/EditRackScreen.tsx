@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,7 @@ export default function EditRackScreen() {
   const [tiles, setTiles] = useState<TileData[]>([]);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const originalTiles = useRef<TileData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export default function EditRackScreen() {
         const data: DetectionResponse = JSON.parse(params.rackTiles as string);
         if (data.data.rack) {
           setTiles(data.data.rack);
+          originalTiles.current = data.data.rack;
         }
       }
     } catch (error) {
@@ -30,6 +32,13 @@ export default function EditRackScreen() {
       setIsLoading(false);
     }
   }, [params.rackTiles]);
+
+  const tilesChanged = (original: TileData[], current: TileData[]): boolean => {
+    if (original.length !== current.length) return true;
+    return original.some((orig, i) =>
+      orig.color !== current[i].color || String(orig.number) !== String(current[i].number)
+    );
+  };
 
   const handleSelectTile = (idx: number) => {
     setSelectedIdx(idx);
@@ -112,7 +121,7 @@ export default function EditRackScreen() {
     console.log(JSON.stringify(updatedRackData, null, 2));
     console.log('=========================');
 
-    // Navigate back with visited flag and updated data
+    // Navigate back with visited flag, updated data, and whether edits were made
     router.push({
       pathname: '/edit',
       params: {
@@ -120,6 +129,10 @@ export default function EditRackScreen() {
         rackTiles: JSON.stringify(updatedRackData),
         rackVisited: 'true',
         boardVisited: params.boardVisited || undefined,
+        rackDetectionId: params.rackDetectionId,
+        boardDetectionId: params.boardDetectionId,
+        rackWasEdited: tilesChanged(originalTiles.current, tiles) ? 'true' : 'false',
+        boardWasEdited: params.boardWasEdited,
       },
     });
   };
