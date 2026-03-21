@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { EDITOR_THEME } from '../src/constants/colors';
@@ -6,6 +6,7 @@ import { findOptimalMove } from '../src/services/optimizeService';
 import { recordTurn } from '../src/services/leaderboardService';
 import { DetectionResponse, TileData, RummikubTile } from '../src/types/tile';
 import { SessionExpiredError } from '../src/services/apiClient';
+import { submitCorrection, deleteTrainingImage } from '../src/services/trainingService';
 
 export default function EditChooserScreen() {
   const router = useRouter();
@@ -13,6 +14,8 @@ export default function EditChooserScreen() {
   const [visitedBoard, setVisitedBoard] = useState(false);
   const [visitedRack, setVisitedRack] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const originalTiles = useRef(params.originalTiles || params.rackTiles);
+  const originalBoard = useRef(params.originalBoard || params.boardGroups);
 
   // Check if user is returning from edit screens
   useFocusEffect(
@@ -81,12 +84,38 @@ export default function EditChooserScreen() {
       }
 
       const cleanGroups: RummikubTile[][] = groups.map(group => group.map(sanitizeTile));
-  
+
       // Clean the 1D array of the rack
       const cleanRack: RummikubTile[] = rack.map(sanitizeTile);
 
-      // Call optimize API
+      // Call optimize API — BoardInvalidError throws here if board is invalid
       const result = await findOptimalMove(cleanGroups, cleanRack);
+
+      // Board is valid — safe to submit training corrections (fire-and-forget)
+      if (params.rackWasEdited === 'true' && params.rackDetectionId) {
+        submitCorrection({
+          detectionId: params.rackDetectionId as string,
+          isRack: true,
+          correctedTiles: rack,
+          imageWidth: rackData.data.imageWidth,
+          imageHeight: rackData.data.imageHeight,
+        });
+      }
+      if (params.boardWasEdited === 'true' && params.boardDetectionId) {
+        submitCorrection({
+          detectionId: params.boardDetectionId as string,
+          isRack: false,
+          correctedTiles: groups.flat(),
+          imageWidth: boardData.data.imageWidth,
+          imageHeight: boardData.data.imageHeight,
+        });
+      }
+
+      // Delete local images that weren't edited (no HF upload needed for unchanged detections)
+      if (params.rackWasEdited !== 'true' && params.rackDetectionId)
+        deleteTrainingImage(params.rackDetectionId as string);
+      if (params.boardWasEdited !== 'true' && params.boardDetectionId)
+        deleteTrainingImage(params.boardDetectionId as string);
 
       // Show results
       const optimizeData = result.data as any;
@@ -124,6 +153,10 @@ export default function EditChooserScreen() {
       }
       // Handle board validation errors specially
       if (error.type === 'BoardInvalidError' && error.invalidGroups) {
+        // Delete local training images — invalid board data is not useful for training
+        if (params.rackDetectionId) deleteTrainingImage(params.rackDetectionId as string);
+        if (params.boardDetectionId) deleteTrainingImage(params.boardDetectionId as string);
+
         setIsOptimizing(false); // Stop loading for the alert
 
         const invalidCount = error.invalidGroups.length;
@@ -200,6 +233,11 @@ export default function EditChooserScreen() {
                 rackTiles: params.rackTiles,
                 boardGroups: params.boardGroups,
                 boardVisited: visitedBoard ? 'true' : undefined,
+                rackDetectionId: params.rackDetectionId,
+                boardDetectionId: params.boardDetectionId,
+                boardWasEdited: params.boardWasEdited,
+                originalTiles: originalTiles.current,
+                originalBoard: originalBoard.current
               },
             })
           }
@@ -234,6 +272,11 @@ export default function EditChooserScreen() {
                 boardGroups: params.boardGroups,
                 rackTiles: params.rackTiles,
                 rackVisited: visitedRack ? 'true' : undefined,
+                boardDetectionId: params.boardDetectionId,
+                rackDetectionId: params.rackDetectionId,
+                rackWasEdited: params.rackWasEdited,
+                originalTiles: originalTiles.current,
+                originalBoard: originalBoard.current
               },
             })
           }

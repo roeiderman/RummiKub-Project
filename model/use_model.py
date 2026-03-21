@@ -21,22 +21,21 @@ import shutil
 MODEL_PATH = Path(__file__).parent / 'models' / 'rummikub_best.pt'
 HF_REPO = os.environ.get('HF_MODEL_REPO', 'roeiderman/Rummikub')
 HF_TOKEN = os.environ.get('HF_TOKEN')
+HF_FILENAME = 'rummikub_best.pt'
 
 
 def ensure_model():
     """Download model from Hugging Face if not present locally."""
     if not MODEL_PATH.exists():
-        print(f"Model not found locally. Downloading from Hugging Face: {HF_REPO}")
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
         try:
-            cached = hf_hub_download(
-                repo_id=HF_REPO,
-                filename='rummikub_best.pt',
-                token=HF_TOKEN
-            )
+            cached = hf_hub_download(repo_id=HF_REPO, filename=HF_FILENAME, token=HF_TOKEN)
+            if MODEL_PATH.exists():
+                return  # another process already wrote the file while we waited
+            print(f"Downloading model from Hugging Face: {HF_REPO}")
             tmp_path = str(MODEL_PATH) + f'.tmp.{os.getpid()}'
             shutil.copy(cached, tmp_path)
-            os.replace(tmp_path, str(MODEL_PATH))  # atomic — safe if two processes run at once
+            os.replace(tmp_path, str(MODEL_PATH))
             print(f"Model downloaded successfully to {MODEL_PATH}")
         except Exception as e:
             raise RuntimeError(f"Failed to download model from Hugging Face: {e}")
@@ -45,7 +44,6 @@ def ensure_model():
 def detect_tiles(image_path, show=False, save=False, json_output=None):
     """Detect Rummikub tiles in an image."""
 
-    # Load trained model (download from HF if not cached locally)
     ensure_model()
     print("Loading model...")
     model = YOLO(str(MODEL_PATH))

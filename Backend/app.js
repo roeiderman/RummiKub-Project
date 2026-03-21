@@ -19,9 +19,11 @@ const userRoutes = require('./routes/users');
 const detectionRoutes = require('./routes/detection');
 const optimizeRoutes = require('./routes/optimize');
 const leaderboardRoutes = require('./routes/leaderboard');
+const trainingRoutes = require('./routes/training');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
+const { cleanupAbandonedImages } = require('./services/trainingService');
 
 // Initialize Express app
 const app = express();
@@ -53,6 +55,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/detection', detectionRoutes);
 app.use('/api/optimize', optimizeRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/training', trainingRoutes);
 
 
 // Root endpoint
@@ -91,6 +94,12 @@ app.use((req, res) => {
 
 // Global error handler (must be last)
 app.use(errorHandler);
+
+// Clean up any images abandoned from previous sessions
+cleanupAbandonedImages();
+
+// Run cleanup every hour to catch images from users who close the app mid-session
+setInterval(() => cleanupAbandonedImages(), 60 * 60 * 1000);
 
 // Start server
 const PORT = process.env.PORT || 3000;

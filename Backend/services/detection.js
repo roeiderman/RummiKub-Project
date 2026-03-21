@@ -29,6 +29,7 @@ const performDetection = async (imageBuffer, options = {}) => {
                 numTilesDetected: result.num_tiles_detected,
                 groups: groups,
                 numSeriesDetected: groups.length,
+                detectionId: result.detectionId,
                 ...(result.annotatedImagePath && { annotatedImagePath: result.annotatedImagePath })
             };
         }
@@ -40,6 +41,7 @@ const performDetection = async (imageBuffer, options = {}) => {
             imageHeight: result.image_height,
             numTilesDetected: result.num_tiles_detected,
             rack: result.tiles,
+            detectionId: result.detectionId,
             ...(result.annotatedImagePath && { annotatedImagePath: result.annotatedImagePath })
         };
     } catch (error) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,16 @@ export default function EditBoardScreen() {
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  const originalBoard = useMemo(() => {
+    try {
+      if (!params.originalBoard) return [];
+      return JSON.parse(params.originalBoard as string).data.groups as TileData[][];
+    } catch (error) {
+      console.error("Failed to parse original history:", error);
+      return [];
+    }
+  }, [params.originalBoard]);
+
   useEffect(() => {
     try {
       if (params.boardGroups) {
@@ -30,6 +40,17 @@ export default function EditBoardScreen() {
       setIsLoading(false);
     }
   }, [params.boardGroups]);
+
+  const tilesChanged = (original: TileData[], current: TileData[]): boolean => {
+    if (original.length !== current.length) return true;
+    return original.some((orig, i) =>
+      orig.color !== current[i].color || String(orig.number) !== String(current[i].number)
+    );
+  };
+
+    useEffect (() => {
+        setHasChanges(tilesChanged(originalBoard.flat(), groups.flat()));
+    }, [groups]);
 
   const handleSelectTile = (pos: TilePosition) => {
     setSelectedPos(pos);
@@ -52,7 +73,6 @@ export default function EditBoardScreen() {
     }
 
     setGroups(newGroups);
-    setHasChanges(true);
   };
 
   const handleColorChange = (color: string) => {
@@ -70,12 +90,10 @@ export default function EditBoardScreen() {
     }
 
     setGroups(newGroups);
-    setHasChanges(true);
   };
 
   const handleSave = () => {
     Alert.alert('Success', 'Board tiles updated successfully!');
-    setHasChanges(false);
   };
 
   const handleBackPress = () => {
@@ -114,14 +132,20 @@ export default function EditBoardScreen() {
     console.log(JSON.stringify(updatedBoardData, null, 2));
     console.log('==========================');
 
-    // Navigate back with visited flag and updated data
-    router.push({
+    // Navigate back with visited flag, updated data, and whether edits were made
+    router.navigate({
       pathname: '/edit',
       params: {
         boardGroups: JSON.stringify(updatedBoardData),
         rackTiles: params.rackTiles,
         boardVisited: 'true',
         rackVisited: params.rackVisited || undefined,
+        boardDetectionId: params.boardDetectionId,
+        rackDetectionId: params.rackDetectionId,
+        boardWasEdited: hasChanges ? 'true' : 'false',
+        rackWasEdited: params.rackWasEdited,
+        originalTiles: params.originalTiles,
+        originalBoard: params.originalBoard
       },
     });
   };
