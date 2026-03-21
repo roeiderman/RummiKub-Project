@@ -13,10 +13,6 @@ const crypto = require('crypto');
 const PYTHON_EXECUTABLE = process.env.PYTHON_PATH || 'python';
 const SCRIPT_NAME = 'use_model.py'; // Name of your python script
 
-// Shared promise — concurrent rack+board calls share one HF check per button press
-let modelCheckPromise = null;
-
-
 /**
  * Apply the Rummikub detection model to an image.
  *
@@ -27,7 +23,6 @@ let modelCheckPromise = null;
  */
 async function detectTiles(image, options = {}) {
     const { annotate = false } = options;
-    await checkModelVersion();
     return new Promise((resolve, reject) => {
         let inputPath;
         let tempImageFile = false;
@@ -280,52 +275,6 @@ function printResults(result) {
         console.log('No tiles detected in image.');
     }
     console.log('\n' + '='.repeat(60));
-}
-
-/**
- * Check HuggingFace for a newer model version before each detection.
- * Concurrent calls (rack + board) share one check via modelCheckPromise.
- * After it resolves, the next button press creates a fresh check.
- */
-async function checkModelVersion() {
-    if (modelCheckPromise) return modelCheckPromise;
-
-    modelCheckPromise = (async () => {
-    const hfRepo = process.env.HF_MODEL_REPO || 'roeiderman/Rummikub';
-    const hfToken = process.env.HF_TOKEN;
-        const modelPath = path.join(__dirname, '..', '..', 'model', 'models', 'rummikub_best.pt');
-
-    try {
-        const response = await fetch(`https://huggingface.co/api/models/${hfRepo}`, {
-            headers: { 'Authorization': `Bearer ${hfToken}` }
-        });
-
-        if (!response.ok) {
-            console.log(`[Model] Could not reach HuggingFace (${response.status}) — using local model.`);
-            return;
-        }
-
-        const data = await response.json();
-        const hfLastModified = new Date(data.lastModified).getTime();
-
-        if (!fs.existsSync(modelPath)) {
-            console.log('[Model] Not found locally — will download on first detection.');
-        } else {
-            const localMtime = fs.statSync(modelPath).mtimeMs;
-            if (hfLastModified > localMtime) {
-                console.log('[Model] HuggingFace has a newer version — removing local copy. Will re-download on first detection.');
-                fs.unlinkSync(modelPath);
-            } else {
-                console.log('[Model] Local model is up to date.');
-            }
-        }
-    } catch (err) {
-        console.log(`[Model] Could not check HuggingFace: ${err.message} — using local model.`);
-    }
-    })();
-
-    await modelCheckPromise;
-    modelCheckPromise = null; // clear so next button press triggers a fresh check
 }
 
 module.exports = {

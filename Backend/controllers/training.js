@@ -12,7 +12,7 @@ const submitCorrection = async (req, res, next) => {
             throw error;
         }
 
-        const result = await recordCorrection({ detectionId, isRack, correctedTiles, imageWidth, imageHeight });
+        const result = await recordCorrection({ detectionId, correctedTiles, imageWidth, imageHeight });
 
         res.status(201).json({
             success: true,

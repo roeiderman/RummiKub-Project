@@ -1,17 +1,22 @@
 /**
  * Training Data Collection Service
- * Converts corrected tile detections to YOLO OBB format and uploads to HuggingFace Dataset.
  */
 
 const fs = require('fs');
 const path = require('path');
-const { uploadFiles } = require('@huggingface/hub');
+const { spawn } = require('child_process');
 const CorrectionCounter = require('../models/CorrectionCounter');
 
-const HF_DATASET_REPO = process.env.HF_DATASET_REPO;
-const HF_TOKEN = process.env.HF_TOKEN;
 const RETRAIN_THRESHOLD = 100;
-const TRAINING_IMAGES_DIR = path.join(__dirname, '..', 'public', 'training_images');
+const DATASET_IMAGES_DIR = path.join(__dirname, '..', '..', 'model', 'dataset', 'images', 'train');
+const DATASET_LABELS_DIR = path.join(__dirname, '..', '..', 'model', 'dataset', 'labels', 'train');
+const TEMP_IMAGES_DIR = path.join(__dirname, '..', 'public', 'training_images');
+const PYTHON_EXECUTABLE = process.env.PYTHON_PATH || 'python';
+
+// // Ensure directories exist
+// [DATASET_IMAGES_DIR, DATASET_LABELS_DIR].forEach(dir => {
+//     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+// });
 
 // Class ID mapping from data.yaml (54 classes)
 // Stored tile color "Orange" maps back to "Yellow" for the label lookup
@@ -55,85 +60,72 @@ function tilesToYoloOBB(tiles, imageWidth, imageHeight) {
     return lines.join('\n');
 }
 
-// Serialize all HF uploads — prevents concurrent commits causing 412 conflicts
-let uploadQueue = Promise.resolve();
+function triggerRetraining() {
+    console.log('\n=======================================');
+    console.log('🤖 TRIGGERING AUTOMATED MODEL RETRAINING');
+    console.log('=======================================\n');
 
-async function uploadToHFDataset(fileName, imagePath, labelContent) {
-    if (!HF_DATASET_REPO) throw new Error('HF_DATASET_REPO is not set in .env');
-    if (!HF_TOKEN) throw new Error('HF_TOKEN is not set in .env');
+    const pythonScript = path.join(__dirname, '..', '..', 'model', 'continue_training.py');
+    const modelDir = path.join(__dirname, '..', '..', 'model'); // Run from root where data.yaml is
 
-    const imageBuffer = fs.readFileSync(imagePath);
+    const pythonProcess = spawn(PYTHON_EXECUTABLE, [pythonScript], { cwd: modelDir });
 
-    // Chain onto the queue so uploads never run simultaneously
-    uploadQueue = uploadQueue.then(async () => {
-        console.log(`[Training] Uploading to HF Dataset (${HF_DATASET_REPO})...`);
-        console.log(`[Training]   images/${fileName}.jpg`);
-        console.log(`[Training]   labels/${fileName}.txt (${labelContent.split('\n').length} tiles)`);
-
-        // Retry up to 3 times on 412 commit conflict
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-                await uploadFiles({
-                    repo: { type: 'dataset', name: HF_DATASET_REPO },
-                    credentials: { accessToken: HF_TOKEN },
-                    files: [
-                        { path: `images/${fileName}.jpg`, content: new Blob([imageBuffer], { type: 'image/jpeg' }) },
-                        { path: `labels/${fileName}.txt`, content: new Blob([labelContent], { type: 'text/plain' }) },
-                    ],
-                    commitTitle: `Add ${fileName}`,
-                });
-                console.log(`[Training] Upload complete.`);
-                return;
-            } catch (err) {
-                if (err.statusCode === 412 && attempt < 3) {
-                    const delay = attempt * 1000;
-                    console.log(`[Training] Commit conflict, retrying in ${delay}ms (attempt ${attempt}/3)...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                } else {
-                    throw err;
-                }
-            }
-        }
+    pythonProcess.stdout.on('data', (data) => {
+        console.log(`[YOLO]: ${data.toString().trim()}`);
     });
 
-    await uploadQueue;
+    pythonProcess.stderr.on('data', (data) => {
+        console.error(`[YOLO ERROR]: ${data.toString().trim()}`);
+    });
+
+    pythonProcess.on('close', (code) => {
+        if (code === 0) {
+            console.log('✅ Retraining completed successfully! New model saved.');
+        } else {
+            console.error(`❌ Retraining failed with exit code ${code}`);
+        }
+    });
 }
 
-async function recordCorrection({ detectionId, isRack, correctedTiles, imageWidth, imageHeight }) {
-    const type = isRack ? 'rack' : 'board';
-    console.log(`[Training] Correction received — ${type}, detectionId: ${detectionId}`);
-    console.log(`[Training] Corrected tiles: ${correctedTiles.length}, image: ${imageWidth}x${imageHeight}`);
+async function recordCorrection({ detectionId, correctedTiles, imageWidth, imageHeight }) {
+    const tempImagePath = path.join(TEMP_IMAGES_DIR, `${detectionId}.jpg`);
 
-    const imagePath = path.join(TRAINING_IMAGES_DIR, `${detectionId}.jpg`);
-
-    if (!fs.existsSync(imagePath)) {
-        console.error(`[Training] Image not found at: ${imagePath}`);
+    if (!fs.existsSync(tempImagePath)) {
         throw new Error(`Training image not found for detectionId: ${detectionId}`);
     }
 
-    // Convert corrected tiles to YOLO OBB format
     const labelContent = tilesToYoloOBB(correctedTiles, imageWidth, imageHeight);
-    console.log(`[Training] YOLO label generated (${labelContent.split('\n').filter(Boolean).length} lines)`);
 
-    // Get next file index atomically (fileIndex never resets, count resets at threshold)
+    // Get next file index
     const counter = await CorrectionCounter.findOneAndUpdate(
         {},
         { $inc: { count: 1, fileIndex: 1 } },
         { upsert: true, returnDocument: 'after' }
     );
-    const fileName = `tile${counter.fileIndex}`;
+    const fileName = `corrected_tile_${counter.fileIndex}`;
 
-    // Upload image + label to HF Dataset
-    await uploadToHFDataset(fileName, imagePath, labelContent);
+    const finalImagePath = path.join(DATASET_IMAGES_DIR, `${fileName}.jpg`);
+    const finalLabelPath = path.join(DATASET_LABELS_DIR, `${fileName}.txt`);
 
-    // Delete local image after successful upload
-    fs.unlinkSync(imagePath);
-    console.log(`[Training] Local image deleted. Saved as ${fileName} on HF.`);
+    // 1. Move the image directly into the YOLO dataset
+    fs.renameSync(tempImagePath, finalImagePath);
+    
+    // 2. Write the label directly into the YOLO dataset
+    fs.writeFileSync(finalLabelPath, labelContent);
+
+    console.log(`[Training] Added ${fileName} to local dataset.`);
     console.log(`[Training] Counter: ${counter.count}/${RETRAIN_THRESHOLD}`);
 
+    // 3. Check threshold and trigger training in the background
     if (counter.count >= RETRAIN_THRESHOLD) {
-        console.warn(`[Training] *** ${RETRAIN_THRESHOLD} corrections reached — dataset ready for retraining ***`);
+        console.warn(`[Training] *** ${RETRAIN_THRESHOLD} corrections reached! ***`);
+        
+        // Reset counter
         await CorrectionCounter.updateOne({}, { $set: { count: 0 } });
+        
+        // Fire and forget the training process so it doesn't block the API response
+        triggerRetraining();
+        
         return { count: 0, retrainingTriggered: true };
     }
 
@@ -151,7 +143,7 @@ async function getStats() {
 }
 
 function deleteTrainingImage(detectionId) {
-    const imagePath = path.join(TRAINING_IMAGES_DIR, `${detectionId}.jpg`);
+    const imagePath = path.join(TEMP_IMAGES_DIR, `${detectionId}.jpg`);
     if (fs.existsSync(imagePath)) {
         fs.unlinkSync(imagePath);
         console.log(`[Training] Deleted local image: ${detectionId}.jpg`);
@@ -159,14 +151,14 @@ function deleteTrainingImage(detectionId) {
 }
 
 function cleanupAbandonedImages(maxAgeMs = 2 * 60 * 60 * 1000) { // default 2 hours
-    if (!fs.existsSync(TRAINING_IMAGES_DIR)) return;
+    if (!fs.existsSync(TEMP_IMAGES_DIR)) return;
 
     const now = Date.now();
-    const files = fs.readdirSync(TRAINING_IMAGES_DIR).filter(f => f.endsWith('.jpg'));
+    const files = fs.readdirSync(TEMP_IMAGES_DIR).filter(f => f.endsWith('.jpg'));
     let deleted = 0;
 
     for (const file of files) {
-        const filePath = path.join(TRAINING_IMAGES_DIR, file);
+        const filePath = path.join(TEMP_IMAGES_DIR, file);
         const { mtimeMs } = fs.statSync(filePath);
         if (now - mtimeMs > maxAgeMs) {
             fs.unlinkSync(filePath);
