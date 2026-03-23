@@ -5,3 +5,4 @@ torchvision>=0.15.0
 opencv-python>=4.8.0
 pillow>=9.5.0
 pyyaml>=6.0
+kaggle>=1.6.0

@@ -5,8 +5,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { exec } = require('child_process');
 const { uploadFiles } = require('@huggingface/hub');
 const CorrectionCounter = require('../models/CorrectionCounter');
+
+const KAGGLE_DIR = path.join(__dirname, '..', '..', 'model');
 
 const HF_DATASET_REPO = process.env.HF_DATASET_REPO;
 const HF_TOKEN = process.env.HF_TOKEN;
@@ -132,8 +136,9 @@ async function recordCorrection({ detectionId, isRack, correctedTiles, imageWidt
     console.log(`[Training] Counter: ${counter.count}/${RETRAIN_THRESHOLD}`);
 
     if (counter.count >= RETRAIN_THRESHOLD) {
-        console.warn(`[Training] *** ${RETRAIN_THRESHOLD} corrections reached — dataset ready for retraining ***`);
+        console.warn(`[Training] *** ${RETRAIN_THRESHOLD} corrections reached — triggering Kaggle retraining ***`);
         await CorrectionCounter.updateOne({}, { $set: { count: 0 } });
+        triggerKaggleTraining();
         return { count: 0, retrainingTriggered: true };
     }
 
@@ -148,6 +153,78 @@ async function getStats() {
         remaining: Math.max(0, RETRAIN_THRESHOLD - count),
         readyForRetraining: count >= RETRAIN_THRESHOLD,
     };
+}
+
+const KAGGLE_CLI         = process.env.KAGGLE_CLI || 'kaggle';
+const KAGGLE_KERNEL_ID   = 'roeiderman1/rummikub-retrain-model';
+const KAGGLE_POLL_MS     = 2 * 60 * 1000; // poll every 2 minutes
+
+function pollKaggleStatus() {
+    console.log(`[Kaggle] Polling status every ${KAGGLE_POLL_MS / 60000} min...`);
+
+    const poll = setInterval(() => {
+        exec(`"${KAGGLE_CLI}" kernels status ${KAGGLE_KERNEL_ID}`, (error, stdout) => {
+            if (error) {
+                console.error('[Kaggle] Could not fetch status:', error.message);
+                clearInterval(poll);
+                return;
+            }
+
+            // Status row is the last non-empty line of the table output
+            const lines = stdout.trim().split('\n').filter(Boolean);
+            const statusLine = lines[lines.length - 1];
+            console.log(`[Kaggle] ${statusLine}`);
+
+            const lower = statusLine.toLowerCase();
+            if (lower.includes('complete')) {
+                console.log('[Kaggle] Job completed successfully! Check HuggingFace for updated model.');
+                clearInterval(poll);
+            } else if (lower.includes('error')) {
+                console.error('[Kaggle] Job failed. Visit kaggle.com for full logs.');
+                clearInterval(poll);
+            } else if (lower.includes('cancel')) {
+                console.warn('[Kaggle] Job was cancelled.');
+                clearInterval(poll);
+            }
+        });
+    }, KAGGLE_POLL_MS);
+}
+
+function ensureKaggleCredentials() {
+    const kaggleDir = path.join(os.homedir(), '.kaggle');
+    const kaggleConfig = path.join(kaggleDir, 'kaggle.json');
+    if (!fs.existsSync(kaggleConfig)) {
+        fs.mkdirSync(kaggleDir, { recursive: true });
+        fs.writeFileSync(
+            kaggleConfig,
+            JSON.stringify({ username: process.env.KAGGLE_USERNAME, key: process.env.KAGGLE_KEY }),
+            { mode: 0o600 }
+        );
+        console.log('[Kaggle] Created ~/.kaggle/kaggle.json from env vars.');
+    }
+}
+
+function triggerKaggleTraining() {
+    ensureKaggleCredentials();
+    console.log('[Kaggle] Pushing retraining job...');
+
+    const env = { ...process.env };
+
+    exec(`"${KAGGLE_CLI}" kernels push -p "${KAGGLE_DIR}"`, { env }, (error, stdout, stderr) => {
+        // Filter out the SSL warning — it's noise, not a real error
+        const realStderr = stderr.replace(/.*NotOpenSSLWarning.*\n?/g, '').trim();
+
+        if (stdout) console.log('[Kaggle]', stdout.trim());
+        if (realStderr) console.error('[Kaggle] stderr:', realStderr);
+
+        if (error) {
+            console.error('[Kaggle] Failed to push job. Exit code:', error.code);
+            console.error('[Kaggle] Make sure ~/.kaggle/kaggle.json exists or KAGGLE_USERNAME/KAGGLE_KEY are set in .env');
+        } else {
+            console.log('[Kaggle] Job pushed successfully. Starting status polling...');
+            setTimeout(pollKaggleStatus, 30 * 1000);
+        }
+    });
 }
 
 function deleteTrainingImage(detectionId) {
