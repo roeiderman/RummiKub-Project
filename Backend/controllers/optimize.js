@@ -44,6 +44,16 @@ const optimize = async (req, res, next) => {
             result.moves = reconstructMoves(groups, result.rackTilesPlayed || [], result.finalBoard);
         }
 
+        // Auto-save as a training challenge scenario if algorithm removed > 4 tiles
+        if (result.success && result.tilesUsed >= 4) {
+            const { maybeSaveScenario } = require('../services/scenarioService');
+            const strip = t => ({ id: t.id, tile: t.tile, color: t.color, number: t.number, isJoker: t.isJoker });
+            const cleanRack = rack.map(strip);
+            const cleanBoard = groups.map(g => g.map(strip));
+            maybeSaveScenario(cleanRack, cleanBoard, result.tilesUsed)
+                .catch(err => console.error('[Scenario] Auto-save failed:', err.message));
+        }
+
         // Success response.
         res.status(200).json({
             success: true,

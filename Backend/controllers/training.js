@@ -3,7 +3,7 @@ const { recordCorrection, getStats, deleteTrainingImage } = require('../services
 const submitCorrection = async (req, res, next) => {
     try {
         const { detectionId, isRack, correctedTiles, imageWidth, imageHeight } = req.body;
-        console.log(`[Training] POST /correction received — detectionId: ${detectionId}, isRack: ${isRack}, tiles: ${correctedTiles?.length}`);
+        console.log(`[Retraining] POST /correction received — detectionId: ${detectionId}, isRack: ${isRack}, tiles: ${correctedTiles?.length}`);
 
         if (!detectionId || correctedTiles === undefined || !imageWidth || !imageHeight) {
             const error = new Error('detectionId, correctedTiles, imageWidth and imageHeight are required');

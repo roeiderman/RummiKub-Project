@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { logoutUser } from '../src/services/authService';
 import { SessionUser, getSessionUser } from '../src/services/sessionService';
 
-const AUTHENTICATED_ROUTES = new Set(['/home', '/edit', '/edit-board', '/edit-rack', '/solution-screen', '/leaderboard']);
+const AUTHENTICATED_ROUTES = new Set(['/home', '/edit', '/edit-board', '/edit-rack', '/solution-screen', '/leaderboard', '/challenges', '/challenge-play']);
 
 export default function UserMenu() {
   const pathname = usePathname();
@@ -104,6 +104,15 @@ export default function UserMenu() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              style={styles.challengesButton}
+              activeOpacity={0.85}
+              onPress={() => { setMenuVisible(false); if (pathname !== '/challenges' && pathname !== '/challenge-play') router.push('/challenges'); }}
+            >
+              <Ionicons name="barbell-outline" size={18} color="#007AFF" />
+              <Text style={styles.challengesText}>Training Challenges</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
               activeOpacity={0.85}
               disabled={isLoggingOut}
@@ -198,6 +207,22 @@ const styles = StyleSheet.create({
   },
   leaderboardText: {
     color: 'rgb(138, 192, 133)',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  challengesButton: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  challengesText: {
+    color: '#007AFF',
     fontSize: 15,
     fontWeight: '700',
   },

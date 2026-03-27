@@ -20,10 +20,12 @@ const detectionRoutes = require('./routes/detection');
 const optimizeRoutes = require('./routes/optimize');
 const leaderboardRoutes = require('./routes/leaderboard');
 const trainingRoutes = require('./routes/training');
+const scenarioRoutes = require('./routes/scenarios');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
 const { cleanupAbandonedImages } = require('./services/trainingService');
+const { loadScenariosFromHF } = require('./services/scenarioService');
 
 // Initialize Express app
 const app = express();
@@ -56,6 +58,7 @@ app.use('/api/detection', detectionRoutes);
 app.use('/api/optimize', optimizeRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/training', trainingRoutes);
+app.use('/api/scenarios', scenarioRoutes);
 
 
 // Root endpoint
@@ -97,6 +100,10 @@ app.use(errorHandler);
 
 // Clean up any images abandoned from previous sessions
 cleanupAbandonedImages();
+
+// Load training challenge scenarios from HuggingFace into memory
+loadScenariosFromHF();
+
 
 // Run cleanup every hour to catch images from users who close the app mid-session
 setInterval(() => cleanupAbandonedImages(), 60 * 60 * 1000);
