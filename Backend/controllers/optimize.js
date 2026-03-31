@@ -44,7 +44,7 @@ const optimize = async (req, res, next) => {
             result.moves = reconstructMoves(groups, result.rackTilesPlayed || [], result.finalBoard);
         }
 
-        // Auto-save as a training challenge scenario if algorithm removed > 4 tiles
+        // Auto-save as a training challenge scenario if algorithm removed >= 4 tiles
         if (result.success && result.tilesUsed >= 4) {
             const { maybeSaveScenario } = require('../services/scenarioService');
             const strip = t => ({ id: t.id, tile: t.tile, color: t.color, number: t.number, isJoker: t.isJoker });

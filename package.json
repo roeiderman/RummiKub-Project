@@ -1,0 +1,7 @@
+{
+  "name": "rummikub-project",
+  "version": "1.0.0",
+  "scripts": {
+    "iba": "npm install --prefix Backend && npm install --prefix mobile-app && python3 -m pip install --break-system-packages -r model/requirements.txt"
+  }
+}
