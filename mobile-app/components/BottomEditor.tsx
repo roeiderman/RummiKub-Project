@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Image, Dimensions, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { TileData } from '../src/types/tile';
 import { EDITOR_THEME } from '../src/constants/colors';
 import NumberPicker from './NumberPicker';
@@ -11,6 +12,7 @@ interface BottomEditorProps {
   onColorChange: (color: string) => void;
   onSave: () => void;
   hasChanges: boolean;
+  imageUri?: string;
 }
 
 export default function BottomEditor({
@@ -19,15 +21,28 @@ export default function BottomEditor({
   onColorChange,
   onSave,
   hasChanges,
+  imageUri,
 }: BottomEditorProps) {
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+
   return (
     <View style={styles.container}>
       {selectedTile ? (
         <View style={styles.content}>
-          {/* Top: Color Picker */}
-          <View style={styles.colorSection}>
-            <Text style={styles.label}>Color:</Text>
-            <ColorPicker onSelectColor={onColorChange} />
+          {/* Top: Color Picker row with image preview button on left */}
+          <View style={styles.colorRow}>
+            <TouchableOpacity
+              style={styles.imagePreviewButton}
+              onPress={() => imageUri && setImageModalVisible(true)}
+              activeOpacity={imageUri ? 0.7 : 1}
+            >
+              <Ionicons name="image-outline" size={20} color={imageUri ? '#FFFFFF' : 'rgba(255,255,255,0.3)'} />
+            </TouchableOpacity>
+
+            <View style={styles.colorSection}>
+              <Text style={styles.label}>Color:</Text>
+              <ColorPicker onSelectColor={onColorChange} />
+            </View>
           </View>
 
           {/* Bottom: Number Picker and Save Button */}
@@ -53,9 +68,43 @@ export default function BottomEditor({
         </View>
       ) : (
         <View style={styles.placeholderContainer}>
+          <TouchableOpacity
+            style={styles.imagePreviewButtonAbsolute}
+            onPress={() => imageUri && setImageModalVisible(true)}
+            activeOpacity={imageUri ? 0.7 : 1}
+          >
+            <Ionicons name="image-outline" size={20} color={imageUri ? '#FFFFFF' : 'rgba(255,255,255,0.3)'} />
+          </TouchableOpacity>
           <Text style={styles.placeholderText}>Tap a tile to edit</Text>
         </View>
       )}
+
+      {/* Image Preview Modal */}
+      <Modal
+        visible={imageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImageModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setImageModalVisible(false)}>
+          <Pressable style={styles.modalContent} onPress={() => {}}>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setImageModalVisible(false)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            {imageUri && (
+              <Image
+                source={{ uri: imageUri }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -81,8 +130,54 @@ const styles = StyleSheet.create({
   content: {
     gap: 16,
   },
-  colorSection: {
+  colorRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+  },
+  imagePreviewButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  colorSection: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 20,
+  },
+  modalContent: {
+    width: Dimensions.get('window').width * 0.82,
+    height: Dimensions.get('window').height * 0.35,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 1,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
   },
   bottomSection: {
     flexDirection: 'row',
@@ -123,7 +218,20 @@ const styles = StyleSheet.create({
   },
   placeholderContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 20,
+  },
+  imagePreviewButtonAbsolute: {
+    position: 'absolute',
+    left: 0,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   placeholderText: {
     color: '#FFFFFF',

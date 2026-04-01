@@ -143,7 +143,9 @@ export default function EditRackScreen() {
         rackWasEdited: hasChanges ? 'true' : 'false',
         boardWasEdited: params.boardWasEdited,
         originalTiles: params.originalTiles,
-        originalBoard: params.originalBoard
+        originalBoard: params.originalBoard,
+        rackImageUri: params.rackImageUri,
+        boardImageUri: params.boardImageUri,
       },
     });
   };
@@ -205,6 +207,7 @@ export default function EditRackScreen() {
         onColorChange={handleColorChange}
         onSave={handleSave}
         hasChanges={hasChanges}
+        imageUri={params.rackImageUri as string | undefined}
       />
     </View>
   );
