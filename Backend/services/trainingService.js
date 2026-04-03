@@ -208,15 +208,18 @@ function triggerKaggleTraining() {
     ensureKaggleCredentials();
     console.log('[Kaggle] Pushing retraining job...');
 
-    const env = { ...process.env };
+    const env = {
+        ...process.env,
+        PYTHONUTF8: '1',           // Python 3.7+ UTF-8 mode — fixes charmap errors on Windows
+        PYTHONIOENCODING: 'utf-8', // Fallback for older Python versions
+    };
 
-    exec(`"${KAGGLE_CLI}" kernels push -p "${KAGGLE_DIR}"`, { env }, (error, stdout, stderr) => {
+    exec(`"${KAGGLE_CLI}" kernels push -p "${KAGGLE_DIR}"`, { env, encoding: 'utf8' }, (error, stdout, stderr) => {
         // Filter out the SSL warning — it's noise, not a real error
         const realStderr = stderr.replace(/.*NotOpenSSLWarning.*\n?/g, '').trim();
 
         if (stdout) console.log('[Kaggle]', stdout.trim());
         if (realStderr) console.error('[Kaggle] stderr:', realStderr);
-
         if (error) {
             console.error('[Kaggle] Failed to push job. Exit code:', error.code);
             console.error('[Kaggle] Make sure ~/.kaggle/kaggle.json exists or KAGGLE_USERNAME/KAGGLE_KEY are set in .env');
