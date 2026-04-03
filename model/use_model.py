@@ -57,7 +57,7 @@ def detect_tiles(image_path, show=False, save=False, json_output=None):
     results = model.predict(
         source=image_path,
         imgsz=640,
-        conf=0.5,           # Raised from 0.25 to filter low-confidence false positives
+        conf=0.6,           # Raised from 0.25 to filter low-confidence false positives
         iou=0.45,           # More aggressive NMS for overlapping boxes
         agnostic_nms=True,  # Suppress overlaps regardless of class
         save=save,          # Save annotated image
