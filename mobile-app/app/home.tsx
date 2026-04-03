@@ -86,6 +86,8 @@ export default function HomeScreen() {
           boardGroups: JSON.stringify(boardData),
           rackDetectionId: rackData.data?.detectionId,
           boardDetectionId: boardData.data?.detectionId,
+          rackImageUri: rackImage,
+          boardImageUri: boardImage,
         }
       });
 

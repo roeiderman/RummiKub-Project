@@ -292,7 +292,9 @@ export default function EditChooserScreen() {
                 boardDetectionId: params.boardDetectionId,
                 boardWasEdited: params.boardWasEdited,
                 originalTiles: originalTiles.current,
-                originalBoard: originalBoard.current
+                originalBoard: originalBoard.current,
+                rackImageUri: params.rackImageUri,
+                boardImageUri: params.boardImageUri,
               },
             })
           }
@@ -333,7 +335,9 @@ export default function EditChooserScreen() {
                 rackDetectionId: params.rackDetectionId,
                 rackWasEdited: params.rackWasEdited,
                 originalTiles: originalTiles.current,
-                originalBoard: originalBoard.current
+                originalBoard: originalBoard.current,
+                rackImageUri: params.rackImageUri,
+                boardImageUri: params.boardImageUri,
               },
             })
           }

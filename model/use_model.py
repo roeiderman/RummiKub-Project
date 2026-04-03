@@ -56,15 +56,16 @@ def detect_tiles(image_path, show=False, save=False, json_output=None):
     print(f"Detecting tiles in: {image_path}")
     results = model.predict(
         source=image_path,
-        imgsz=640,
-        conf=0.6,           # Raised from 0.25 to filter low-confidence false positives
-        iou=0.45,           # More aggressive NMS for overlapping boxes
-        agnostic_nms=True,  # Suppress overlaps regardless of class
-        save=save,          # Save annotated image
-        show=show,          # Display window
+        imgsz=1280,         
+        conf=0.6,          # TWEAK: 0.5 keeps it sensitive enough for dark/blurry photos
+        iou=0.60,           # CHANGE: Lower to 0.60 to catch heavily overlapping boxes
+        agnostic_nms=True,  # CHANGE: Set to True to force overlapping classes to eliminate each other
+        max_det=300,        
+        save=save,          
+        show=show,          
         verbose=True,
-        project=str(predict_folder),  # Use absolute path to predict/ in root
-        exist_ok=False      # Auto-increment: predict/predict/, predict/predict2/, predict/predict3/...
+        project=str(predict_folder),  
+        exist_ok=False      
     )
 
     # Prepare JSON data
