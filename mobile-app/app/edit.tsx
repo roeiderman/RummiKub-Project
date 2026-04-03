@@ -83,6 +83,59 @@ export default function EditChooserScreen() {
         return;
       }
 
+      // Validate joker counts across board + rack (max 1 red joker, 1 black joker)
+      const isJoker = (tile: TileData) =>
+        tile.tile?.includes('Joker') || (tile.isJoker === true && tile.number === null);
+      const allTiles = [...groups.flat(), ...rack];
+      const redJokers   = allTiles.filter(t => isJoker(t) && t.color === 'Red');
+      const blackJokers = allTiles.filter(t => isJoker(t) && t.color === 'Black');
+
+      if (redJokers.length > 1 || blackJokers.length > 1) {
+        setIsOptimizing(false);
+        let jokerError = '';
+        if (redJokers.length > 1)   jokerError += `• ${redJokers.length} Red jokers found (max 1)\n`;
+        if (blackJokers.length > 1) jokerError += `• ${blackJokers.length} Black jokers found (max 1)\n`;
+
+        Alert.alert(
+          'Invalid Joker Count',
+          `There can only be 1 Red joker and 1 Black joker in the game.\n\n${jokerError}\nPlease fix the joker tiles before continuing.`,
+          [
+            {
+              text: 'Fix Board',
+              onPress: () => router.push({
+                pathname: '/edit-board',
+                params: {
+                  boardGroups: params.boardGroups,
+                  rackTiles: params.rackTiles,
+                  rackVisited: visitedRack ? 'true' : undefined,
+                  boardDetectionId: params.boardDetectionId,
+                  rackDetectionId: params.rackDetectionId,
+                  originalTiles: originalTiles.current,
+                  originalBoard: originalBoard.current,
+                },
+              }),
+            },
+            {
+              text: 'Fix Rack',
+              onPress: () => router.push({
+                pathname: '/edit-rack',
+                params: {
+                  rackTiles: params.rackTiles,
+                  boardGroups: params.boardGroups,
+                  boardVisited: visitedBoard ? 'true' : undefined,
+                  rackDetectionId: params.rackDetectionId,
+                  boardDetectionId: params.boardDetectionId,
+                  originalTiles: originalTiles.current,
+                  originalBoard: originalBoard.current,
+                },
+              }),
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+        return;
+      }
+
       const cleanGroups: RummikubTile[][] = groups.map(group => group.map(sanitizeTile));
 
       // Clean the 1D array of the rack
@@ -224,8 +277,10 @@ export default function EditChooserScreen() {
           style={[
             styles.button,
             !visitedRack && styles.buttonUnvisited,
-            visitedRack && styles.buttonVisited
+            visitedRack && styles.buttonVisited,
+            isOptimizing && styles.buttonDisabled,
           ]}
+          disabled={isOptimizing}
           onPress={() =>
             router.push({
               pathname: '/edit-rack',
@@ -265,8 +320,10 @@ export default function EditChooserScreen() {
           style={[
             styles.button,
             !visitedBoard && styles.buttonUnvisited,
-            visitedBoard && styles.buttonVisited
+            visitedBoard && styles.buttonVisited,
+            isOptimizing && styles.buttonDisabled,
           ]}
+          disabled={isOptimizing}
           onPress={() =>
             router.push({
               pathname: '/edit-board',
@@ -369,6 +426,9 @@ const styles = StyleSheet.create({
     borderColor: '#4CAF50',
     borderWidth: 3,
     backgroundColor: 'rgba(76, 175, 80, 0.15)',
+  },
+  buttonDisabled: {
+    opacity: 0.4,
   },
   checkmarkBadge: {
     position: 'absolute',
