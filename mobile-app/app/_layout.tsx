@@ -37,6 +37,8 @@ export default function RootLayout() {
         <Stack.Screen name="edit-rack" />
         <Stack.Screen name="solution-screen" />
         <Stack.Screen name="leaderboard" />
+        <Stack.Screen name="challenges" />
+        <Stack.Screen name="challenge-play" />
       </Stack>
       <UserMenu />
       {sessionExpiredVisible && (

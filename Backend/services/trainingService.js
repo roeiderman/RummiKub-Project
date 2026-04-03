@@ -45,7 +45,7 @@ function tilesToYoloOBB(tiles, imageWidth, imageHeight) {
         if (!tile.corners || tile.corners.length !== 4) continue;
         const classId = getClassId(tile);
         if (classId === null) {
-            console.warn(`[Training] Unknown class for tile: ${JSON.stringify(tile)}`);
+            console.warn(`[Retraining] Unknown class for tile: ${JSON.stringify(tile)}`);
             continue;
         }
         const coords = tile.corners
@@ -70,9 +70,9 @@ async function uploadToHFDataset(fileName, imagePath, labelContent) {
 
     // Chain onto the queue so uploads never run simultaneously
     uploadQueue = uploadQueue.then(async () => {
-        console.log(`[Training] Uploading to HF Dataset (${HF_DATASET_REPO})...`);
-        console.log(`[Training]   images/${fileName}.jpg`);
-        console.log(`[Training]   labels/${fileName}.txt (${labelContent.split('\n').length} tiles)`);
+        console.log(`[Retraining] Uploading to HF Dataset (${HF_DATASET_REPO})...`);
+        console.log(`[Retraining]   images/${fileName}.jpg`);
+        console.log(`[Retraining]   labels/${fileName}.txt (${labelContent.split('\n').length} tiles)`);
 
         // Retry up to 3 times on 412 commit conflict
         for (let attempt = 1; attempt <= 3; attempt++) {
@@ -86,12 +86,12 @@ async function uploadToHFDataset(fileName, imagePath, labelContent) {
                     ],
                     commitTitle: `Add ${fileName}`,
                 });
-                console.log(`[Training] Upload complete.`);
+                console.log(`[Retraining] Upload complete.`);
                 return;
             } catch (err) {
                 if (err.statusCode === 412 && attempt < 3) {
                     const delay = attempt * 1000;
-                    console.log(`[Training] Commit conflict, retrying in ${delay}ms (attempt ${attempt}/3)...`);
+                    console.log(`[Retraining] Commit conflict, retrying in ${delay}ms (attempt ${attempt}/3)...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 } else {
                     throw err;
@@ -105,19 +105,19 @@ async function uploadToHFDataset(fileName, imagePath, labelContent) {
 
 async function recordCorrection({ detectionId, isRack, correctedTiles, imageWidth, imageHeight }) {
     const type = isRack ? 'rack' : 'board';
-    console.log(`[Training] Correction received — ${type}, detectionId: ${detectionId}`);
-    console.log(`[Training] Corrected tiles: ${correctedTiles.length}, image: ${imageWidth}x${imageHeight}`);
+    console.log(`[Retraining] Correction received — ${type}, detectionId: ${detectionId}`);
+    console.log(`[Retraining] Corrected tiles: ${correctedTiles.length}, image: ${imageWidth}x${imageHeight}`);
 
     const imagePath = path.join(TRAINING_IMAGES_DIR, `${detectionId}.jpg`);
 
     if (!fs.existsSync(imagePath)) {
-        console.error(`[Training] Image not found at: ${imagePath}`);
+        console.error(`[Retraining] Image not found at: ${imagePath}`);
         throw new Error(`Training image not found for detectionId: ${detectionId}`);
     }
 
     // Convert corrected tiles to YOLO OBB format
     const labelContent = tilesToYoloOBB(correctedTiles, imageWidth, imageHeight);
-    console.log(`[Training] YOLO label generated (${labelContent.split('\n').filter(Boolean).length} lines)`);
+    console.log(`[Retraining] YOLO label generated (${labelContent.split('\n').filter(Boolean).length} lines)`);
 
     // Get next file index atomically (fileIndex never resets, count resets at threshold)
     const counter = await CorrectionCounter.findOneAndUpdate(
@@ -132,11 +132,11 @@ async function recordCorrection({ detectionId, isRack, correctedTiles, imageWidt
 
     // Delete local image after successful upload
     fs.unlinkSync(imagePath);
-    console.log(`[Training] Local image deleted. Saved as ${fileName} on HF.`);
-    console.log(`[Training] Counter: ${counter.count}/${RETRAIN_THRESHOLD}`);
+    console.log(`[Retraining] Local image deleted. Saved as ${fileName} on HF.`);
+    console.log(`[Retraining] Counter: ${counter.count}/${RETRAIN_THRESHOLD}`);
 
     if (counter.count >= RETRAIN_THRESHOLD) {
-        console.warn(`[Training] *** ${RETRAIN_THRESHOLD} corrections reached — triggering Kaggle retraining ***`);
+        console.warn(`[Retraining] *** ${RETRAIN_THRESHOLD} corrections reached — triggering Kaggle retraining ***`);
         await CorrectionCounter.updateOne({}, { $set: { count: 0 } });
         triggerKaggleTraining();
         return { count: 0, retrainingTriggered: true };
@@ -231,7 +231,7 @@ function deleteTrainingImage(detectionId) {
     const imagePath = path.join(TRAINING_IMAGES_DIR, `${detectionId}.jpg`);
     if (fs.existsSync(imagePath)) {
         fs.unlinkSync(imagePath);
-        console.log(`[Training] Deleted local image: ${detectionId}.jpg`);
+        console.log(`[Retraining] Deleted local image: ${detectionId}.jpg`);
     }
 }
 
@@ -252,7 +252,7 @@ function cleanupAbandonedImages(maxAgeMs = 2 * 60 * 60 * 1000) { // default 2 ho
     }
 
     if (deleted > 0) {
-        console.log(`[Training] Cleaned up ${deleted} abandoned image(s) older than ${maxAgeMs / 3600000}h`);
+        console.log(`[Retraining] Cleaned up ${deleted} abandoned image(s) older than ${maxAgeMs / 3600000}h`);
     }
 }
 
