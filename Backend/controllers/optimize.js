@@ -58,8 +58,8 @@ const optimize = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: result,
-            message: result.tilesPlayed > 0
-                ? `Found optimal move: ${result.tilesPlayed} tile(s) played`
+            message: result.tilesUsed > 0
+                ? `Found optimal move: ${result.tilesUsed} tile(s) played`
                 : 'No valid move found'
         });
     } catch (error) {
