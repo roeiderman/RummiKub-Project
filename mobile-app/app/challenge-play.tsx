@@ -210,11 +210,11 @@ export default function ChallengePlayScreen() {
         return;
       }
 
-      // Board tiles can only go to rack if it's a joker AND the user has already placed a tile
+      // Board → rack: user-placed tiles (_source:'rack') can always go back;
+      // original board tiles (_source:'board') can only go back if they are jokers.
       if (source.kind === 'rack' && selectedTile.source.kind === 'board') {
-        const canTakeJoker = selectedTile.tile.isJoker && rack.length < originalRackLength.current;
-        console.log('[ChallengePlay] board→rack attempt', { isJoker: selectedTile.tile.isJoker, tilesPlaced: originalRackLength.current - rack.length, canTakeJoker });
-        if (!canTakeJoker) { setSelectedTile(null); return; }
+        const canGoBack = selectedTile.tile._source === 'rack' || selectedTile.tile.isJoker;
+        if (!canGoBack) { setSelectedTile(null); return; }
       }
 
       // Move selected tile to just before this tile
@@ -271,8 +271,8 @@ export default function ChallengePlayScreen() {
     if (selectedTile.source.kind === 'rack') return; // already in rack
     // Board tiles can only go to rack if it's a joker AND the user has already placed a tile
     if (selectedTile.source.kind === 'board') {
-      const canTakeJoker = selectedTile.tile.isJoker && rack.length < originalRackLength.current;
-      if (!canTakeJoker) return;
+      const canGoBack = selectedTile.tile._source === 'rack' || selectedTile.tile.isJoker;
+      if (!canGoBack) return;
     }
     saveHistory();
     const { rack: r1, boardGroups: b1 } = removeTile(rack, boardGroups, selectedTile.source);
@@ -451,7 +451,10 @@ export default function ChallengePlayScreen() {
       <TouchableOpacity
         activeOpacity={selectedTile ? 0.8 : 1}
         onPress={handleRackBackgroundTap}
-        style={[styles.rackSection, selectedTile && (selectedTile.source.kind === 'rack' || (selectedTile.tile.isJoker && tilesPlacedSoFar > 0)) && styles.rackSectionHighlight]}
+        style={[styles.rackSection, selectedTile && (
+          selectedTile.source.kind === 'rack' ||
+          (selectedTile.source.kind === 'board' && (selectedTile.tile._source === 'rack' || selectedTile.tile.isJoker))
+        ) && styles.rackSectionHighlight]}
       >
         <Text style={styles.sectionLabel}>YOUR RACK</Text>
         <View style={styles.rackTiles}>
@@ -517,25 +520,55 @@ export default function ChallengePlayScreen() {
       >
         <Pressable style={styles.modalBackdrop} onPress={() => undefined}>
           <View style={styles.modalCard}>
-            {resultModal?.isNewRecord && (
-              <Text style={styles.newRecordLabel}>🏆 NEW RECORD!</Text>
-            )}
-            <Text style={styles.modalTitle}>
-              You placed {resultModal?.tilesPlaced ?? 0} tile(s)!
+
+            {/* Header */}
+            <Text style={styles.modalEmoji}>
+              {resultModal?.isNewRecord ? '🏆' : '🎉'}
             </Text>
-            {!resultModal?.isNewRecord && resultModal?.previousRecord !== undefined && (
-              <Text style={styles.modalDescription}>
-                Previous best: {resultModal.previousRecord} tiles.
-                {resultModal.tilesPlaced >= (resultModal.previousRecord ?? 0)
-                  ? ''
-                  : ' Keep trying!'}
-              </Text>
-            )}
-            {resultModal?.isNewRecord && (
-              <Text style={styles.modalDescription}>
-                You beat the record of {resultModal.previousRecord} tiles!
-              </Text>
-            )}
+            <Text style={[styles.modalHeaderTitle, resultModal?.isNewRecord && styles.modalHeaderTitleGold]}>
+              {resultModal?.isNewRecord ? 'New Record!' : 'Nice Move!'}
+            </Text>
+
+            {/* 3 stat boxes: You / AI / Record */}
+            <View style={styles.statsRow}>
+              <View style={[styles.statBox, styles.statBoxGreen]}>
+                <Text style={[styles.statNum, { color: '#166534' }]}>
+                  {resultModal?.tilesPlaced ?? 0}
+                </Text>
+                <Text style={styles.statLabel}>You{'\n'}Placed</Text>
+              </View>
+
+              <View style={[styles.statBox, styles.statBoxBlue]}>
+                <Text style={[styles.statNum, { color: '#1d4ed8' }]}>
+                  {scenario?.algorithmTilesRemoved ?? 0}
+                </Text>
+                <Text style={styles.statLabel}>AI{'\n'}Removed</Text>
+              </View>
+
+              <View style={[styles.statBox, styles.statBoxGold]}>
+                <Text style={[styles.statNum, { color: '#92400e' }]}>
+                  {resultModal?.isNewRecord
+                    ? resultModal.tilesPlaced
+                    : (resultModal?.previousRecord ?? 0)}
+                </Text>
+                <Text style={styles.statLabel}>
+                  {resultModal?.isNewRecord ? 'New\nRecord' : 'Best\nRecord'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Comparison line */}
+            <Text style={styles.comparisonText}>
+              {resultModal?.isNewRecord
+                ? `You beat the previous record of ${resultModal.previousRecord} tiles!`
+                : resultModal !== null && resultModal.previousRecord > 0
+                  ? resultModal.tilesPlaced >= resultModal.previousRecord
+                    ? 'You matched the record — incredible!'
+                    : `${resultModal.previousRecord - resultModal.tilesPlaced} tile(s) away from the record`
+                  : 'Be the first to set a record on this challenge!'}
+            </Text>
+
+            <View style={styles.modalDivider} />
 
             <TouchableOpacity
               style={styles.primaryButton}
@@ -763,26 +796,57 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 10,
   },
-  newRecordLabel: {
-    fontSize: 22,
-    fontWeight: '900',
+  modalEmoji: {
+    fontSize: 40,
     textAlign: 'center',
     marginBottom: 6,
-    color: '#F39C12',
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+  modalHeaderTitle: {
+    fontSize: 24,
+    fontWeight: '900',
     textAlign: 'center',
     color: '#1f2933',
-    marginBottom: 8,
+    marginBottom: 18,
   },
-  modalDescription: {
-    fontSize: 15,
+  modalHeaderTitleGold: {
+    color: '#d97706',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  statBoxGreen: { backgroundColor: '#dcfce7' },
+  statBoxBlue:  { backgroundColor: '#dbeafe' },
+  statBoxGold:  { backgroundColor: '#fef3c7' },
+  statNum: {
+    fontSize: 28,
+    fontWeight: '900',
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 15,
+  },
+  comparisonText: {
+    fontSize: 14,
     color: '#52606d',
     textAlign: 'center',
-    lineHeight: 21,
-    marginBottom: 20,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginBottom: 16,
   },
   primaryButton: {
     backgroundColor: '#007AFF',
