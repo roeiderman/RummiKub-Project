@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -76,6 +77,7 @@ export default function ChallengesScreen() {
   const pathname = usePathname();
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -88,6 +90,19 @@ export default function ChallengesScreen() {
       setError(e.message || 'Failed to load challenges');
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    setError(null);
+    try {
+      const data = await listScenarios();
+      setScenarios(data);
+    } catch (e: any) {
+      setError(e.message || 'Failed to refresh challenges');
+    } finally {
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -114,11 +129,21 @@ export default function ChallengesScreen() {
         <Text style={styles.errorText}>{error}</Text>
       ) : (
         <FlatList
+          style={styles.list}
           data={scenarios}
           keyExtractor={(item) => item.id}
           renderItem={({ item, index }) => (
             <ScenarioCard item={item} index={index} onPress={() => handlePress(item)} />
           )}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor="#4000ffff"
+              colors={['#1e00ffff']}
+              progressBackgroundColor="#FFFFFF"
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="game-controller-outline" size={48} color="#ccc" />
@@ -140,6 +165,7 @@ const styles = StyleSheet.create({
   backButton: { position: 'absolute', top: 60, left: 16, padding: 4, zIndex: 10 },
   title: { fontSize: 26, fontWeight: 'bold', textAlign: 'center', marginBottom: 4, color: '#333' },
   subtitle: { fontSize: 14, color: '#888', textAlign: 'center', marginBottom: 20 },
+  list: { flex: 1 },
   loader: { marginTop: 40 },
   errorText: { textAlign: 'center', marginTop: 40, color: '#D84B4B', fontSize: 15 },
   card: {

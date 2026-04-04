@@ -210,11 +210,10 @@ export default function ChallengePlayScreen() {
         return;
       }
 
-      // Board → rack: user-placed tiles (_source:'rack') can always go back;
-      // original board tiles (_source:'board') can only go back if they are jokers.
+      // Board → rack: only user-placed tiles (_source:'rack') can go back.
+      // Original board tiles stay on the board permanently.
       if (source.kind === 'rack' && selectedTile.source.kind === 'board') {
-        const canGoBack = selectedTile.tile._source === 'rack' || selectedTile.tile.isJoker;
-        if (!canGoBack) { setSelectedTile(null); return; }
+        if (selectedTile.tile._source !== 'rack') { setSelectedTile(null); return; }
       }
 
       // Move selected tile to just before this tile
@@ -269,10 +268,9 @@ export default function ChallengePlayScreen() {
   const handleRackBackgroundTap = useCallback(() => {
     if (!selectedTile) return;
     if (selectedTile.source.kind === 'rack') return; // already in rack
-    // Board tiles can only go to rack if it's a joker AND the user has already placed a tile
+    // Only user-placed tiles can return to rack; original board tiles stay permanently.
     if (selectedTile.source.kind === 'board') {
-      const canGoBack = selectedTile.tile._source === 'rack' || selectedTile.tile.isJoker;
-      if (!canGoBack) return;
+      if (selectedTile.tile._source !== 'rack') return;
     }
     saveHistory();
     const { rack: r1, boardGroups: b1 } = removeTile(rack, boardGroups, selectedTile.source);
@@ -320,7 +318,8 @@ export default function ChallengePlayScreen() {
     setIsSubmitting(true);
     try {
       const result = await submitAttempt(scenario.id, boardGroups);
-      setResultModal(result);
+      // Count = tiles removed from the original rack (start - end), not backend count
+      setResultModal({ ...result, tilesPlaced: originalRackLength.current - rack.length });
     } catch (e: any) {
       setSubmitError(e.message || 'Submission failed. Check your board.');
     } finally {
@@ -453,7 +452,7 @@ export default function ChallengePlayScreen() {
         onPress={handleRackBackgroundTap}
         style={[styles.rackSection, selectedTile && (
           selectedTile.source.kind === 'rack' ||
-          (selectedTile.source.kind === 'board' && (selectedTile.tile._source === 'rack' || selectedTile.tile.isJoker))
+          (selectedTile.source.kind === 'board' && selectedTile.tile._source === 'rack')
         ) && styles.rackSectionHighlight]}
       >
         <Text style={styles.sectionLabel}>YOUR RACK</Text>

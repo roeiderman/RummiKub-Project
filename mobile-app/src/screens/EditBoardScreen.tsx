@@ -18,7 +18,7 @@ export default function EditBoardScreen() {
   const originalBoard = useMemo(() => {
     try {
       if (!params.originalBoard) return [];
-      return JSON.parse(params.originalBoard as string).data.groups as TileData[][];
+      return (JSON.parse(params.originalBoard as string).data?.groups ?? []) as TileData[][];
     } catch (error) {
       console.error("Failed to parse original history:", error);
       return [];
