@@ -9,35 +9,47 @@ Usage:
     python use_model.py image.jpg --json output.json # Export to JSON
 """
 
+import os
+import subprocess
 from ultralytics import YOLO
 import argparse
 import json
-import os
 from pathlib import Path
-from huggingface_hub import hf_hub_download
-import shutil
 
 
 MODEL_PATH = Path(__file__).parent / 'models' / 'rummikub_best.pt'
-HF_REPO = os.environ.get('HF_MODEL_REPO', 'roeiderman/Rummikub')
-HF_TOKEN = os.environ.get('HF_TOKEN')
+HF_REPO     = os.environ.get('HF_MODEL_REPO', 'roeiderman/Rummikub')
+HF_TOKEN    = os.environ.get('HF_TOKEN')
 HF_FILENAME = 'rummikub_best.pt'
 
 
 def ensure_model():
-    """Download model from Hugging Face if not present locally."""
+    """Download model from Hugging Face using curl (uses system TLS — no Python SSL issues)."""
     if not MODEL_PATH.exists():
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+        url = f"https://huggingface.co/{HF_REPO}/resolve/main/{HF_FILENAME}"
+        print(f"Downloading model from Hugging Face: {HF_REPO}")
+
+        tmp_path = str(MODEL_PATH) + f'.tmp.{os.getpid()}'
         try:
-            cached = hf_hub_download(repo_id=HF_REPO, filename=HF_FILENAME, token=HF_TOKEN)
+            subprocess.run(
+                [
+                    'curl', '-L', '-f',
+                    '-H', f'Authorization: Bearer {HF_TOKEN}',
+                    '-o', tmp_path,
+                    url,
+                ],
+                check=True,
+            )
             if MODEL_PATH.exists():
-                return  # another process already wrote the file while we waited
-            print(f"Downloading model from Hugging Face: {HF_REPO}")
-            tmp_path = str(MODEL_PATH) + f'.tmp.{os.getpid()}'
-            shutil.copy(cached, tmp_path)
+                os.unlink(tmp_path)  # our download is redundant, clean up
+                return
             os.replace(tmp_path, str(MODEL_PATH))
             print(f"Model downloaded successfully to {MODEL_PATH}")
         except Exception as e:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
             raise RuntimeError(f"Failed to download model from Hugging Face: {e}")
 
 
@@ -61,7 +73,6 @@ def detect_tiles(image_path, show=False, save=False, json_output=None):
         iou=0.60,           # CHANGE: Lower to 0.60 to catch heavily overlapping boxes
         agnostic_nms=True,  # CHANGE: Set to True to force overlapping classes to eliminate each other
         max_det=300, 
-        augment=True,    
         save=save,          
         show=show,          
         verbose=True,
