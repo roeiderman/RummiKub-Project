@@ -18,7 +18,7 @@ export default function EditRackScreen() {
   const originalTiles = useMemo(() => {
     try {
       if (!params.originalTiles) return [];
-      return JSON.parse(params.originalTiles as string).data.rack as TileData[];
+      return (JSON.parse(params.originalTiles as string).data?.rack ?? []) as TileData[];
     } catch (error) {
       console.error("Failed to parse original history:", error);
       return [];
