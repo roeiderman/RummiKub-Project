@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { usePathname, useRouter } from 'expo-router';
+import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import { Scenario, listScenarios } from '../src/services/scenarioService';
 import { TILE_COLORS } from '../src/constants/colors';
 import { RummikubTile } from '../src/types/tile';
@@ -43,7 +43,12 @@ function RackPreview({ rack }: { rack: RummikubTile[] }) {
   );
 }
 
-function ScenarioCard({ item, index, onPress }: { item: Scenario; index: number; onPress: () => void }) {
+function ScenarioCard({ item, index, onPress, onLeaderboardPress }: {
+  item: Scenario;
+  index: number;
+  onPress: () => void;
+  onLeaderboardPress: () => void;
+}) {
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onPress}>
       <View style={styles.cardHeader}>
@@ -65,7 +70,17 @@ function ScenarioCard({ item, index, onPress }: { item: Scenario; index: number;
             </View>
           )}
         </View>
-        <Ionicons name="chevron-forward" size={18} color="#999" />
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            onPress={(e) => { e.stopPropagation(); onLeaderboardPress(); }}
+            style={styles.podiumButton}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="podium-outline" size={18} color="#888" />
+          </TouchableOpacity>
+          <Ionicons name="chevron-forward" size={18} color="#999" />
+        </View>
       </View>
       <RackPreview rack={item.rack} />
     </TouchableOpacity>
@@ -110,9 +125,24 @@ export default function ChallengesScreen() {
     load();
   }, [load]);
 
+  // Silently refresh data every time the screen comes back into focus
+  // (e.g. after submitting a challenge attempt) so recordHolder stays current
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoading) handleRefresh();
+    }, [isLoading, handleRefresh])
+  );
+
   const handlePress = (scenario: Scenario) => {
     if (pathname === '/challenge-play') return;
     router.push({ pathname: '/challenge-play', params: { id: scenario.id } });
+  };
+
+  const handleLeaderboardPress = (scenario: Scenario) => {
+    router.push({
+      pathname: '/challenge-leaderboard',
+      params: { id: scenario.id, aiScore: String(scenario.algorithmTilesRemoved) },
+    });
   };
 
   return (
@@ -133,7 +163,12 @@ export default function ChallengesScreen() {
           data={scenarios}
           keyExtractor={(item) => item.id}
           renderItem={({ item, index }) => (
-            <ScenarioCard item={item} index={index} onPress={() => handlePress(item)} />
+            <ScenarioCard
+              item={item}
+              index={index}
+              onPress={() => handlePress(item)}
+              onLeaderboardPress={() => handleLeaderboardPress(item)}
+            />
           )}
           refreshControl={
             <RefreshControl
@@ -183,6 +218,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 10,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  podiumButton: {
+    padding: 2,
   },
   badgeRow: { flexDirection: 'row', gap: 8, flexShrink: 1, flexWrap: 'wrap' },
   aiBadge: {
