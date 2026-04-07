@@ -60,8 +60,7 @@ def detect_tiles(image_path, show=False, save=False, json_output=None):
         conf=0.6,          # TWEAK: 0.5 keeps it sensitive enough for dark/blurry photos
         iou=0.60,           # CHANGE: Lower to 0.60 to catch heavily overlapping boxes
         agnostic_nms=True,  # CHANGE: Set to True to force overlapping classes to eliminate each other
-        max_det=300, 
-        augment=True,    
+        max_det=300,   
         save=save,          
         show=show,          
         verbose=True,

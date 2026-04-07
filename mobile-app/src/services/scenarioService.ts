@@ -24,6 +24,14 @@ export interface AttemptResult {
   previousRecord: number;
 }
 
+export interface ScenarioLeaderboardEntry {
+  email: string;
+  bestScore: number;
+  attempts?: number;
+  achievedAt?: string;
+  isAI: boolean;
+}
+
 export async function listScenarios(): Promise<Scenario[]> {
   const response = await apiFetch(`${API_BASE_URL}/api/scenarios`);
   const data = await response.json();
@@ -44,16 +52,26 @@ export async function getScenario(id: string): Promise<Scenario> {
 
 export async function submitAttempt(
   scenarioId: string,
-  submittedBoard: RummikubTile[][]
+  submittedBoard: RummikubTile[][],
+  tilesPlaced: number
 ): Promise<AttemptResult> {
   const response = await apiFetch(`${API_BASE_URL}/api/scenarios/${scenarioId}/attempt`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ submittedBoard }),
+    body: JSON.stringify({ submittedBoard, tilesPlaced }),
   });
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data.error?.message || 'Failed to submit attempt');
   }
   return data.data as AttemptResult;
+}
+
+export async function getScenarioLeaderboard(scenarioId: string): Promise<ScenarioLeaderboardEntry[]> {
+  const response = await apiFetch(`${API_BASE_URL}/api/scenarios/${scenarioId}/leaderboard`);
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error?.message || 'Failed to fetch leaderboard');
+  }
+  return data.data as ScenarioLeaderboardEntry[];
 }

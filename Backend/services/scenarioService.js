@@ -11,6 +11,7 @@
 const crypto = require('crypto');
 const { uploadFiles } = require('@huggingface/hub');
 const { isValidRun, isValidSet } = require('../utils/gameLogic');
+const ScenarioLeaderboard = require('../models/ScenarioLeaderboard');
 
 const HF_SCENARIOS_REPO = process.env.HF_SCENARIOS_REPO;
 const HF_TOKEN = process.env.HF_TOKEN;
@@ -163,7 +164,7 @@ async function maybeSaveScenario(rack, board, algorithmTilesRemoved) {
 async function listScenarios() {
     await ensureLoaded();
     return Array.from(scenarioCache.values())
-        .sort((a, b) => b.algorithmTilesRemoved - a.algorithmTilesRemoved);
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
 async function getScenario(id) {
@@ -193,7 +194,7 @@ function countRackTilesPlaced(originalRack, submittedBoard) {
     return placed;
 }
 
-async function submitAttempt(scenarioId, userEmail, submittedBoard) {
+async function submitAttempt(scenarioId, userEmail, submittedBoard, tilesPlaced) {
     const scenario = await getScenario(scenarioId);
     if (!scenario) {
         const err = new Error('Scenario not found');
@@ -210,9 +211,29 @@ async function submitAttempt(scenarioId, userEmail, submittedBoard) {
         }
     }
 
-    const tilesPlaced = countRackTilesPlaced(scenario.rack, submittedBoard);
     const previousRecord = scenario.recordHolder?.tilesPlaced ?? 0;
     const isNewRecord = tilesPlaced > previousRecord;
+
+    // Update leaderboard: one document per scenario, embedded entries array per user.
+    // Step 1 — try to update existing user entry (increment attempts, update best score + date)
+    const updated = await ScenarioLeaderboard.updateOne(
+        { scenarioId, 'entries.email': userEmail },
+        {
+            $inc: { 'entries.$[e].attempts': 1 },
+            $max: { 'entries.$[e].bestScore': tilesPlaced },
+            $set: { 'entries.$[e].achievedAt': new Date() },
+        },
+        { arrayFilters: [{ 'e.email': userEmail }] }
+    );
+
+    // Step 2 — if user has no entry yet, push a new one (also creates the scenario doc if missing)
+    if (updated.modifiedCount === 0) {
+        await ScenarioLeaderboard.findOneAndUpdate(
+            { scenarioId },
+            { $push: { entries: { email: userEmail, bestScore: tilesPlaced, attempts: 1, achievedAt: new Date() } } },
+            { upsert: true }
+        );
+    }
 
     if (isNewRecord) {
         const recordHolder = { email: userEmail, tilesPlaced, achievedAt: new Date().toISOString() };
@@ -262,4 +283,12 @@ function loadScenariosFromHF() {
     ensureLoaded().catch(err => console.error('[Scenario] Startup load failed:', err.message));
 }
 
-module.exports = { loadScenariosFromHF, maybeSaveScenario, listScenarios, getScenario, submitAttempt };
+async function getScenarioLeaderboard(scenarioId) {
+    const doc = await ScenarioLeaderboard.findOne({ scenarioId }).lean();
+    if (!doc) return [];
+    return (doc.entries || [])
+        .sort((a, b) => b.bestScore - a.bestScore)
+        .slice(0, 50);
+}
+
+module.exports = { loadScenariosFromHF, maybeSaveScenario, listScenarios, getScenario, submitAttempt, getScenarioLeaderboard };
