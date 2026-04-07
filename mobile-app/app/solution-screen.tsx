@@ -265,7 +265,7 @@ export default function AnimatedSolutionScreen() {
 
         {/* Right Button */}
         <TouchableOpacity
-          style={styles.bottomStepArrow}
+          style={[styles.bottomStepArrow, currentMove === null && styles.bottomStepArrowDisabled]}
           activeOpacity={0.85}
           onPress={handleNextStep}
           disabled={currentMove === null}
