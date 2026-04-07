@@ -26,6 +26,7 @@ const scenarioRoutes = require('./routes/scenarios');
 const errorHandler = require('./middleware/errorHandler');
 const { cleanupAbandonedImages } = require('./services/trainingService');
 const { loadScenariosFromHF } = require('./services/scenarioService');
+const { preloadBgModel } = require('./utils/detect');
 
 // Initialize Express app
 const app = express();
@@ -103,6 +104,9 @@ cleanupAbandonedImages();
 
 // Load training challenge scenarios from HuggingFace into memory
 loadScenariosFromHF();
+
+// Pre-download RMBG-2.0 background removal model (fire-and-forget)
+preloadBgModel();
 
 
 // Run cleanup every hour to catch images from users who close the app mid-session

@@ -328,10 +328,26 @@ async function checkModelVersion() {
     modelCheckPromise = null; // clear so next button press triggers a fresh check
 }
 
+/**
+ * Pre-download RMBG-2.0 background removal model on server startup.
+ * Runs use_model.py --preload so the files are ready before first detection.
+ */
+function preloadBgModel() {
+    const modelDir = path.join(__dirname, '..', '..', 'model');
+    console.log('[BG] Pre-downloading RMBG-2.0 model...');
+    const python = spawn(PYTHON_EXECUTABLE, [SCRIPT_NAME, '--preload'], { cwd: modelDir });
+    python.stdout.on('data', (data) => process.stdout.write(data));
+    python.stderr.on('data', (data) => process.stderr.write(data.toString()));
+    python.on('close', (code) => {
+        if (code !== 0) console.error('[BG] Model preload failed with exit code', code);
+    });
+}
+
 module.exports = {
     detectTiles,
     saveAnnotatedImage,
-    printResults
+    printResults,
+    preloadBgModel,
 };
 
 // CLI usage

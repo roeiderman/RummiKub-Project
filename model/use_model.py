@@ -10,17 +10,34 @@ Usage:
 """
 
 import os
+import sys
+import types
+import importlib.util
 import subprocess
 from ultralytics import YOLO
 import argparse
 import json
+import cv2
 from pathlib import Path
 
-
+# ── YOLO model ────────────────────────────────────────────────────────────────
 MODEL_PATH = Path(__file__).parent / 'models' / 'rummikub_best.pt'
 HF_REPO     = os.environ.get('HF_MODEL_REPO', 'roeiderman/Rummikub')
 HF_TOKEN    = os.environ.get('HF_TOKEN')
 HF_FILENAME = 'rummikub_best.pt'
+
+# ── BRIA RMBG-2.0 background removal model ───────────────────────────────────
+BG_REPO       = os.environ.get('HF_BG_MODEL_REPO', 'Rummikub-project/remove_background')
+BG_MODEL_PATH = Path(__file__).parent / 'models' / 'RMBG-2.0'
+BG_BASE_URL   = f'https://huggingface.co/{BG_REPO}/resolve/main/RMBG-2.0'
+BG_FILES      = [
+    'config.json',
+    'model.safetensors',
+    'birefnet.py',
+    'BiRefNet_config.py',
+    'preprocessor_config.json',
+]
+_bg_model = None  # loaded once per process
 
 
 def ensure_model():
@@ -53,6 +70,98 @@ def ensure_model():
             raise RuntimeError(f"Failed to download model from Hugging Face: {e}")
 
 
+def ensure_bg_model():
+    """Download BRIA RMBG-2.0 files from HF with curl if not present locally."""
+    BG_MODEL_PATH.mkdir(parents=True, exist_ok=True)
+    missing = [f for f in BG_FILES if not (BG_MODEL_PATH / f).exists()]
+    if not missing:
+        return
+    print(f"[BG] Downloading RMBG-2.0 ({len(missing)} file(s)) from {BG_REPO}...")
+    for filename in missing:
+        print(f"[BG]   {filename}...")
+        subprocess.run(
+            ['curl', '-L', '-f',
+             '-H', f'Authorization: Bearer {HF_TOKEN}',
+             '-o', str(BG_MODEL_PATH / filename),
+             f'{BG_BASE_URL}/{filename}'],
+            check=True,
+        )
+    print("[BG] RMBG-2.0 ready.")
+
+
+def _load_birefnet():
+    """Load BiRefNet directly from local files (bypasses transformers meta-tensor issue)."""
+    pkg = types.ModuleType("rmbg")
+    pkg.__path__ = [str(BG_MODEL_PATH)]
+    pkg.__package__ = "rmbg"
+    sys.modules["rmbg"] = pkg
+
+    def _load(name, filepath):
+        spec = importlib.util.spec_from_file_location(
+            f"rmbg.{name}", filepath, submodule_search_locations=[]
+        )
+        mod = importlib.util.module_from_spec(spec)
+        mod.__package__ = "rmbg"
+        sys.modules[f"rmbg.{name}"] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+    _load("BiRefNet_config", str(BG_MODEL_PATH / "BiRefNet_config.py"))
+    bb = _load("birefnet",   str(BG_MODEL_PATH / "birefnet.py"))
+
+    import torch
+    from safetensors.torch import load_file
+    from rmbg.BiRefNet_config import BiRefNetConfig
+
+    device = 'mps' if torch.backends.mps.is_available() else 'cpu'
+    config = BiRefNetConfig()
+    model  = bb.BiRefNet(config)
+    state  = load_file(str(BG_MODEL_PATH / "model.safetensors"))
+    model.load_state_dict(state)
+    model.to(device).eval()
+    print(f"[BG] RMBG-2.0 loaded on {device}.")
+    return model, device
+
+
+def remove_background(image_path):
+    """Remove image background with RMBG-2.0 and replace with white."""
+    global _bg_model
+    try:
+        import torch
+        from torchvision import transforms
+        from PIL import Image, ImageOps
+
+        if _bg_model is None:
+            ensure_bg_model()
+            _bg_model = _load_birefnet()   # returns (model, device) tuple
+
+        model, device = _bg_model
+        image = ImageOps.exif_transpose(Image.open(image_path)).convert("RGB")
+        orig_size = image.size
+
+        transform = transforms.Compose([
+            transforms.Resize((1024, 1024)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+        inp = transform(image).unsqueeze(0).to(device)
+
+        with torch.no_grad():
+            preds = model(inp)[-1].sigmoid().cpu()
+
+        mask     = transforms.ToPILImage()(preds[0].squeeze()).resize(orig_size)
+        white_bg = Image.new("RGB", orig_size, (255, 255, 255))
+        white_bg.paste(image, mask=mask)
+        white_path = str(image_path) + ".white_bg.jpg"
+        white_bg.save(white_path, "JPEG", quality=95)
+        return white_path
+
+    except Exception as e:
+        print(f"[BG] Background removal skipped ({e}) — using original image.")
+        return image_path
+
+
+
 def detect_tiles(image_path, show=False, save=False, json_output=None):
     """Detect Rummikub tiles in an image."""
 
@@ -64,21 +173,47 @@ def detect_tiles(image_path, show=False, save=False, json_output=None):
     project_root = Path(__file__).parent
     predict_folder = project_root / 'predict'
 
+    # Remove background before detection
+    detection_source = remove_background(image_path)
+
+    # Darken slightly to make white plastic tiles pop against the background
+    if detection_source != str(image_path):
+        img = cv2.imread(detection_source)
+        if img is not None:
+            img = cv2.convertScaleAbs(img, alpha=0.8, beta=0)
+            cv2.imwrite(detection_source, img, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            print("[Preprocess] Darkening applied (alpha=0.8).")
+
+    # Audit confidence scores across all detected tiles
+    debug_results = model.predict(source=detection_source, imgsz=1280, conf=0.01, iou=0.45,
+                                   agnostic_nms=False, max_det=300, verbose=False)
+    if debug_results and debug_results[0].obb is not None:
+        preds = sorted([(model.names[int(b.cls[0])], float(b.conf[0]))
+                         for b in debug_results[0].obb], key=lambda x: x[1])
+        print("[Debug] All predictions by confidence:")
+        for name, conf in preds:
+            marker = " ← below threshold" if conf < 0.5 else ""
+            print(f"  {name}: {conf:.3f}{marker}")
+
     # Run detection
     print(f"Detecting tiles in: {image_path}")
     results = model.predict(
-        source=image_path,
-        imgsz=1280,         
-        conf=0.6,          # TWEAK: 0.5 keeps it sensitive enough for dark/blurry photos
-        iou=0.60,           # CHANGE: Lower to 0.60 to catch heavily overlapping boxes
+        source=detection_source,
+        imgsz=1280,
+        conf=0.5,          # TWEAK: 0.5 keeps it sensitive enough for dark/blurry photos
+        iou=0.45,           # CHANGE: Lower to 0.60 to catch heavily overlapping boxes
         agnostic_nms=True,  # CHANGE: Set to True to force overlapping classes to eliminate each other
-        max_det=300, 
-        save=save,          
-        show=show,          
+        max_det=300,
+        save=save,
+        show=show,
         verbose=True,
-        project=str(predict_folder),  
-        exist_ok=False      
+        project=str(predict_folder),
+        exist_ok=False
     )
+
+    # Clean up white-background temp file if one was created
+    if detection_source != image_path and os.path.exists(detection_source):
+        os.unlink(detection_source)
 
     # Prepare JSON data
     json_data = {
@@ -172,11 +307,17 @@ def detect_tiles(image_path, show=False, save=False, json_output=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Detect Rummikub tiles')
-    parser.add_argument('image', help='Path to image file')
-    parser.add_argument('--show', action='store_true', help='Display results window')
-    parser.add_argument('--save', action='store_true', help='Save annotated image')
-    parser.add_argument('--json', type=str, help='Export detection data to JSON file')
+    parser.add_argument('image', nargs='?', help='Path to image file')
+    parser.add_argument('--show',    action='store_true', help='Display results window')
+    parser.add_argument('--save',    action='store_true', help='Save annotated image')
+    parser.add_argument('--json',    type=str,            help='Export detection data to JSON file')
+    parser.add_argument('--preload', action='store_true', help='Pre-download models and exit')
 
     args = parser.parse_args()
 
-    detect_tiles(args.image, show=args.show, save=args.save, json_output=args.json)
+    if args.preload:
+        ensure_model()
+        ensure_bg_model()
+        print("✓ All models ready.")
+    else:
+        detect_tiles(args.image, show=args.show, save=args.save, json_output=args.json)
