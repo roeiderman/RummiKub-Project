@@ -317,9 +317,9 @@ export default function ChallengePlayScreen() {
     setSubmitError(null);
     setIsSubmitting(true);
     try {
-      const result = await submitAttempt(scenario.id, boardGroups);
-      // Count = tiles removed from the original rack (start - end), not backend count
-      setResultModal({ ...result, tilesPlaced: originalRackLength.current - rack.length });
+      const tilesPlaced = originalRackLength.current - rack.length;
+      const result = await submitAttempt(scenario.id, boardGroups, tilesPlaced);
+      setResultModal(result);
     } catch (e: any) {
       setSubmitError(e.message || 'Submission failed. Check your board.');
     } finally {
@@ -388,17 +388,6 @@ export default function ChallengePlayScreen() {
           <Text style={styles.progressText}>You've placed {tilesPlacedSoFar} tile(s)</Text>
         )}
       </View>
-
-      {selectedTile && (
-        <View style={styles.selectionBanner}>
-          <Text style={styles.selectionText}>
-            Tile selected: tap a group to place it, or tap "New Group"
-          </Text>
-          <TouchableOpacity onPress={() => setSelectedTile(null)}>
-            <Ionicons name="close-circle" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Board */}
       <ScrollView style={styles.boardScroll} contentContainerStyle={styles.boardContent}>
@@ -575,6 +564,21 @@ export default function ChallengePlayScreen() {
               onPress={() => { setResultModal(null); router.replace('/challenges'); }}
             >
               <Text style={styles.primaryButtonText}>Try Another Challenge</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.leaderboardButton}
+              activeOpacity={0.85}
+              onPress={() => {
+                setResultModal(null);
+                router.push({
+                  pathname: '/challenge-leaderboard',
+                  params: { id: scenario!.id, aiScore: String(scenario!.algorithmTilesRemoved) },
+                });
+              }}
+            >
+              <Ionicons name="podium-outline" size={16} color="#007AFF" />
+              <Text style={styles.leaderboardButtonText}>View Leaderboard</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -855,6 +859,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  leaderboardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#007AFF',
+    borderRadius: 14,
+    paddingVertical: 13,
+    marginBottom: 10,
+  },
+  leaderboardButtonText: { color: '#007AFF', fontSize: 16, fontWeight: '700' },
   secondaryButton: {
     backgroundColor: '#f0f0f0',
     borderRadius: 14,

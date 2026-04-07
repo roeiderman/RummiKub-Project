@@ -39,6 +39,7 @@ export default function RootLayout() {
         <Stack.Screen name="leaderboard" />
         <Stack.Screen name="challenges" />
         <Stack.Screen name="challenge-play" />
+        <Stack.Screen name="challenge-leaderboard" options={{ headerShown: false }} />
       </Stack>
       <UserMenu />
       {sessionExpiredVisible && (
