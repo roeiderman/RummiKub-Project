@@ -6,6 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 router.use(requireAuth);
 
 router.get('/', scenariosController.list);
+router.get('/:id/leaderboard', scenariosController.getLeaderboard);
 router.get('/:id', scenariosController.getOne);
 router.post('/:id/attempt', scenariosController.submitAttempt);
 
