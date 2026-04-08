@@ -34,7 +34,7 @@ function hfRawUrl(filePath) {
     return `https://huggingface.co/datasets/${HF_SCENARIOS_REPO}/resolve/main/${filePath}`;
 }
 
-async function fetchFromHF(filePath, timeoutMs = 8000) {
+async function fetchFromHF(filePath, timeoutMs = 20000) {
     const res = await fetch(hfRawUrl(filePath), {
         headers: { Authorization: `Bearer ${HF_TOKEN}` },
         signal: AbortSignal.timeout(timeoutMs),
@@ -84,17 +84,17 @@ async function ensureLoaded() {
                 cacheLoaded = true;
                 return;
             }
-            for (const meta of index) {
-                if (meta.id) {
-                    const full = await fetchFromHF(`scenario_${meta.id}.json`);
-                    if (full) scenarioCache.set(meta.id, full);
-                }
-            }
+            // Load all scenario files in parallel instead of sequentially
+            const results = await Promise.all(
+                index.filter(m => m.id).map(m => fetchFromHF(`scenario_${m.id}.json`))
+            );
+            results.forEach(full => { if (full) scenarioCache.set(full.id, full); });
             console.log(`[Scenario] Loaded ${scenarioCache.size} scenario(s) from HF.`);
+            cacheLoaded = true; // only mark loaded on success
         } catch (err) {
-            console.error('[Scenario] HF load failed (empty cache):', err.message);
+            console.error('[Scenario] HF load failed — will retry on next request:', err.message);
+            loadingPromise = null; // allow retry on next request
         }
-        cacheLoaded = true;
     })();
 
     return loadingPromise;
