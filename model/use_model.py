@@ -20,6 +20,8 @@ import json
 import cv2
 from pathlib import Path
 
+DEBUG_PREDICTIONS = os.environ.get("RUMMIKUB_DEBUG_PREDICTIONS", "").lower() in {"1", "true", "yes", "on"}
+
 # ── YOLO model ────────────────────────────────────────────────────────────────
 MODEL_PATH = Path(__file__).parent / 'models' / 'rummikub_best.pt'
 HF_REPO     = os.environ.get('HF_MODEL_REPO', 'roeiderman/Rummikub')
@@ -128,6 +130,12 @@ def remove_background(image_path):
     global _bg_model
     try:
         import torch
+        import os
+        import multiprocessing
+
+        # Force PyTorch to use all available CPU cores
+        cores = multiprocessing.cpu_count()
+        torch.set_num_threads(cores)
         from torchvision import transforms
         from PIL import Image, ImageOps
 
@@ -140,7 +148,7 @@ def remove_background(image_path):
         orig_size = image.size
 
         transform = transforms.Compose([
-            transforms.Resize((1024, 1024)),
+            transforms.Resize((512, 512)),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
@@ -162,9 +170,11 @@ def remove_background(image_path):
 
 
 
-def detect_tiles(image_path, show=False, save=False, json_output=None):
+def detect_tiles(image_path, show=False, save=False, json_output=None, debug_predictions=DEBUG_PREDICTIONS):
     """Detect Rummikub tiles in an image."""
 
+    if not image_path or not os.path.exists(image_path):
+        raise FileNotFoundError(f"{image_path} does not exist")
     ensure_model()
     print("Loading model...")
     model = YOLO(str(MODEL_PATH))
@@ -184,16 +194,17 @@ def detect_tiles(image_path, show=False, save=False, json_output=None):
             cv2.imwrite(detection_source, img, [cv2.IMWRITE_JPEG_QUALITY, 95])
             print("[Preprocess] Darkening applied (alpha=0.8).")
 
-    # Audit confidence scores across all detected tiles
-    debug_results = model.predict(source=detection_source, imgsz=1280, conf=0.01, iou=0.45,
-                                   agnostic_nms=False, max_det=300, verbose=False)
-    if debug_results and debug_results[0].obb is not None:
-        preds = sorted([(model.names[int(b.cls[0])], float(b.conf[0]))
-                         for b in debug_results[0].obb], key=lambda x: x[1])
-        print("[Debug] All predictions by confidence:")
-        for name, conf in preds:
-            marker = " ← below threshold" if conf < 0.5 else ""
-            print(f"  {name}: {conf:.3f}{marker}")
+    # Run the extra low-threshold inference only when explicitly requested.
+    if debug_predictions:
+        debug_results = model.predict(source=detection_source, imgsz=1280, conf=0.01, iou=0.45,
+                                      agnostic_nms=False, max_det=300, verbose=False)
+        if debug_results and debug_results[0].obb is not None:
+            preds = sorted([(model.names[int(b.cls[0])], float(b.conf[0]))
+                            for b in debug_results[0].obb], key=lambda x: x[1])
+            print("[Debug] All predictions by confidence:")
+            for name, conf in preds:
+                marker = " ← below threshold" if conf < 0.5 else ""
+                print(f"  {name}: {conf:.3f}{marker}")
 
     # Run detection
     print(f"Detecting tiles in: {image_path}")
@@ -203,8 +214,7 @@ def detect_tiles(image_path, show=False, save=False, json_output=None):
         conf=0.5,          # TWEAK: 0.5 keeps it sensitive enough for dark/blurry photos
         iou=0.45,           # CHANGE: Lower to 0.60 to catch heavily overlapping boxes
         agnostic_nms=True,  # CHANGE: Set to True to force overlapping classes to eliminate each other
-        max_det=300, 
-        augment=True,    
+        max_det=300,     
         save=save,          
         show=show,          
         verbose=True,
@@ -313,6 +323,7 @@ if __name__ == '__main__':
     parser.add_argument('--save',    action='store_true', help='Save annotated image')
     parser.add_argument('--json',    type=str,            help='Export detection data to JSON file')
     parser.add_argument('--preload', action='store_true', help='Pre-download models and exit')
+    parser.add_argument('--debug-predictions', action='store_true', help='Run the extra low-threshold debug inference')
 
     args = parser.parse_args()
 
@@ -321,4 +332,10 @@ if __name__ == '__main__':
         ensure_bg_model()
         print("✓ All models ready.")
     else:
-        detect_tiles(args.image, show=args.show, save=args.save, json_output=args.json)
+        detect_tiles(
+            args.image,
+            show=args.show,
+            save=args.save,
+            json_output=args.json,
+            debug_predictions=args.debug_predictions,
+        )
