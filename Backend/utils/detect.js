@@ -99,6 +99,12 @@ async function detectTiles(image, options = {}) {
                     tempImageFile = false;
                 }
 
+                // Save white-background version for training (better than original for the model)
+                if (result.white_bg_path && fs.existsSync(result.white_bg_path)) {
+                    const whiteBgSavePath = path.join(trainingImagesDir, `${detectionId}_white.jpg`);
+                    fs.renameSync(result.white_bg_path, whiteBgSavePath);
+                }
+
                 const normalizedResult = {
                     success: true,
                     image: result.image,

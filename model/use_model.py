@@ -222,15 +222,15 @@ def detect_tiles(image_path, show=False, save=False, json_output=None, debug_pre
         exist_ok=False
     )
 
-    # Clean up white-background temp file if one was created
-    if detection_source != image_path and os.path.exists(detection_source):
-        os.unlink(detection_source)
-
     # Prepare JSON data
+    # Include white_bg_path so Node.js can use it as the training image instead of the original.
+    # Node.js is responsible for deleting the white_bg file after saving it.
+    white_bg_path = detection_source if detection_source != str(image_path) else None
     json_data = {
         "image": str(Path(image_path).name),
         "image_width": results[0].orig_shape[1] if results else 0,
         "image_height": results[0].orig_shape[0] if results else 0,
+        "white_bg_path": white_bg_path,
         "tiles": []
     }
 
