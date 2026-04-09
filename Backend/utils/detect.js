@@ -12,6 +12,7 @@ const crypto = require('crypto');
 // Get Python path from .env or default to 'python'
 const PYTHON_EXECUTABLE = process.env.PYTHON_PATH || 'python';
 const SCRIPT_NAME = 'use_model.py'; // Name of your python script
+const DEBUG_PREDICTIONS = ['1', 'true', 'yes', 'on'].includes(String(process.env.RUMMIKUB_DEBUG_PREDICTIONS || '').toLowerCase());
 
 // Shared promise — concurrent rack+board calls share one HF check per button press
 let modelCheckPromise = null;
@@ -32,10 +33,8 @@ async function detectTiles(image, options = {}) {
         let inputPath;
         let tempImageFile = false;
 
-        // CREATE A UNIQUE ID FOR THIS SPECIFIC REQUEST
         const detectionId = crypto.randomUUID();
 
-        // 1. PREPARE IMAGE
         if (Buffer.isBuffer(image)) {
             inputPath = path.join(__dirname, `temp_image_${detectionId}.jpg`);
             fs.writeFileSync(inputPath, image);
@@ -54,10 +53,11 @@ async function detectTiles(image, options = {}) {
         const jsonOutputPath = path.join(__dirname, `temp_detections_${detectionId}.json`);
         const absoluteImagePath = path.resolve(inputPath);
         const modelDir = path.join(__dirname, '..', '..', 'model');
-        
-        // 2. RUN PYTHON DETECTION (+ annotation in the same call if requested)
+
         const spawnArgs = [SCRIPT_NAME, absoluteImagePath, '--json', jsonOutputPath];
         if (annotate) spawnArgs.push('--save');
+        if (DEBUG_PREDICTIONS) spawnArgs.push('--debug-predictions');
+
         const python = spawn(PYTHON_EXECUTABLE, spawnArgs, { cwd: modelDir });
 
         let errorData = '';
@@ -65,15 +65,10 @@ async function detectTiles(image, options = {}) {
         python.stderr.on('data', (data) => errorData += data.toString());
 
         python.on('close', (code) => {
-            // Note: We do NOT delete the temp file here anymore!
-
             if (code !== 0) {
                 console.error('Python process error:', errorData);
                 if (fs.existsSync(jsonOutputPath)) fs.unlinkSync(jsonOutputPath);
-                
-                // Cleanup on error
                 if (tempImageFile && fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-                
                 return reject(new Error(`Model inference failed: ${errorData}`));
             }
 
@@ -85,25 +80,29 @@ async function detectTiles(image, options = {}) {
 
                 const jsonData = fs.readFileSync(jsonOutputPath, 'utf8');
                 const result = JSON.parse(jsonData);
-                fs.unlinkSync(jsonOutputPath); // Delete JSON temp file
+                fs.unlinkSync(jsonOutputPath);
 
                 console.log(`Detected ${result.tiles.length} tiles`);
 
-                // Normalize tile colors (Yellow -> Orange for Rummikub standard colors)
                 const normalizedTiles = result.tiles.map(tile => ({
                     ...tile,
                     color: tile.color === 'Yellow' ? 'Orange' : tile.color,
-                    number: parseInt(tile.number, 10), // Ensure number is a string for consistency
-                    isJoker: tile.tile.toLowerCase().includes('joker') // Add isJoker flag based on tile name
+                    number: parseInt(tile.number, 10),
+                    isJoker: tile.tile.toLowerCase().includes('joker')
                 }));
 
-                // Save image for training data collection
                 const trainingImagesDir = path.join(__dirname, '..', 'public', 'training_images');
                 fs.mkdirSync(trainingImagesDir, { recursive: true });
                 const savedImagePath = path.join(trainingImagesDir, `${detectionId}.jpg`);
                 if (tempImageFile && fs.existsSync(inputPath)) {
                     fs.renameSync(inputPath, savedImagePath);
-                    tempImageFile = false; // file is now at savedImagePath, not inputPath
+                    tempImageFile = false;
+                }
+
+                // Save white-background version for training (better than original for the model)
+                if (result.white_bg_path && fs.existsSync(result.white_bg_path)) {
+                    const whiteBgSavePath = path.join(trainingImagesDir, `${detectionId}_white.jpg`);
+                    fs.renameSync(result.white_bg_path, whiteBgSavePath);
                 }
 
                 const normalizedResult = {
@@ -116,7 +115,6 @@ async function detectTiles(image, options = {}) {
                     detectionId
                 };
 
-                // 3. FIND ANNOTATED IMAGE (already saved by the single Python call above)
                 if (annotate) {
                     try {
                         const predictDir = path.join(modelDir, 'predict');
@@ -136,6 +134,7 @@ async function detectTiles(image, options = {}) {
                         console.error('Warning: Failed to find annotated image:', err.message);
                     }
                 }
+
                 resolve(normalizedResult);
             } catch (err) {
                 if (fs.existsSync(jsonOutputPath)) fs.unlinkSync(jsonOutputPath);
@@ -160,12 +159,10 @@ async function detectTiles(image, options = {}) {
  */
 async function saveAnnotatedImage(image) {
     return new Promise((resolve, reject) => {
-        // Determine if input is file path or buffer
         let inputPath;
         let tempImageFile = false;
 
         if (Buffer.isBuffer(image)) {
-            // If buffer, save to temp file
             const uniqueId = crypto.randomBytes(8).toString('hex');
             inputPath = path.join(__dirname, `temp_image_annotate_${uniqueId}.jpg`);
             fs.writeFileSync(inputPath, image);
@@ -183,10 +180,10 @@ async function saveAnnotatedImage(image) {
 
         const absoluteImagePath = path.resolve(inputPath);
         const modelDir = path.join(__dirname, '..', '..', 'model');
-        
-        const python = spawn(PYTHON_EXECUTABLE, [
-            SCRIPT_NAME, absoluteImagePath, '--save'
-        ], { cwd: modelDir });
+        const spawnArgs = [SCRIPT_NAME, absoluteImagePath, '--save'];
+        if (DEBUG_PREDICTIONS) spawnArgs.push('--debug-predictions');
+
+        const python = spawn(PYTHON_EXECUTABLE, spawnArgs, { cwd: modelDir });
 
         let errorData = '';
         python.stdout.on('data', (data) => process.stdout.write(data));
@@ -205,13 +202,11 @@ async function saveAnnotatedImage(image) {
             }
 
             try {
-                // Find the annotated image in predict folder
                 const predictDir = path.join(modelDir, 'predict');
                 if (!fs.existsSync(predictDir)) {
                     return reject(new Error('Predict directory not found'));
                 }
 
-                // Find the most recent predict folder
                 const folders = fs.readdirSync(predictDir)
                     .filter(f => f.startsWith('predict'))
                     .map(f => ({
@@ -226,11 +221,10 @@ async function saveAnnotatedImage(image) {
                 }
 
                 const imageName = path.basename(absoluteImagePath);
-                // YOLO sometimes saves as .jpg even if input is .png, check both
-                let annotatedImagePath = path.join(folders[0].path, imageName);
-                
+                const annotatedImagePath = path.join(folders[0].path, imageName);
+
                 if (!fs.existsSync(annotatedImagePath)) {
-                     return reject(new Error(`Annotated image not found: ${annotatedImagePath}`));
+                    return reject(new Error(`Annotated image not found: ${annotatedImagePath}`));
                 }
 
                 resolve(annotatedImagePath);
@@ -328,10 +322,26 @@ async function checkModelVersion() {
     modelCheckPromise = null; // clear so next button press triggers a fresh check
 }
 
+/**
+ * Pre-download RMBG-2.0 background removal model on server startup.
+ * Runs use_model.py --preload so the files are ready before first detection.
+ */
+function preloadBgModel() {
+    const modelDir = path.join(__dirname, '..', '..', 'model');
+    console.log('[BG] Pre-downloading RMBG-2.0 model...');
+    const python = spawn(PYTHON_EXECUTABLE, [SCRIPT_NAME, '--preload'], { cwd: modelDir });
+    python.stdout.on('data', (data) => process.stdout.write(data));
+    python.stderr.on('data', (data) => process.stderr.write(data.toString()));
+    python.on('close', (code) => {
+        if (code !== 0) console.error('[BG] Model preload failed with exit code', code);
+    });
+}
+
 module.exports = {
     detectTiles,
     saveAnnotatedImage,
-    printResults
+    printResults,
+    preloadBgModel,
 };
 
 // CLI usage

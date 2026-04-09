@@ -96,8 +96,8 @@ model/predict/
 predict/
 
 # Dataset (large files - keep structure but ignore actual images)
-model/dataset/images/
-model/dataset/labels/
+model/dataset/
+model/models/
 
 # Logs and events
 *.log

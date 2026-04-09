@@ -64,6 +64,7 @@ export default function EditBoardScreen() {
 
     // Update number
     tile.number = number === 'joker' ? '0' : number;
+    tile.isJoker = number === 'joker';
 
     // Update tile string
     if (number === 'joker') {

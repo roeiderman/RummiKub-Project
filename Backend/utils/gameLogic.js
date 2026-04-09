@@ -28,8 +28,9 @@ function isValidRun(tiles) {
     const jokers = tiles.filter(t => isJoker(t));
     const regularTiles = tiles.filter(t => !isJoker(t));
 
-    // Need at least 2 regular tiles to determine color and sequence
-    if (regularTiles.length < 2) return false;
+    // Need at least 1 regular tile to determine color and sequence
+    // (2 jokers can extend a single tile into a valid run, e.g. 8 + 2 jokers → 7-8-9)
+    if (regularTiles.length < 1) return false;
 
     // Check all regular tiles have same color
     const color = regularTiles[0].color;
@@ -76,8 +77,9 @@ function isValidSet(tiles) {
     const jokers = tiles.filter(t => isJoker(t));
     const regularTiles = tiles.filter(t => !isJoker(t));
 
-    // Need at least 2 regular tiles to determine number
-    if (regularTiles.length < 2) return false;
+    // Need at least 1 regular tile to determine number
+    // (2 jokers can substitute for 2 missing colors, e.g. 8 + 2 jokers → valid set)
+    if (regularTiles.length < 1) return false;
 
     // Check all regular tiles have same number (normalize to int to handle "5" vs 5)
     const number = parseInt(regularTiles[0].number);

@@ -1,6 +1,9 @@
 import subprocess
 import sys
 
+SCRIPT_VERSION = "v2-auto-trigger"
+print(f"=== Rummikub Retraining Script {SCRIPT_VERSION} ===")
+
 # ── 0. Install Dependencies ────────────────────────────────────────────────
 print("=== Fixing PyTorch for Kaggle's P100 GPU Compatibility ===")
 # 1. מחיקת הגרסה החדשה והלא-תואמת
@@ -16,6 +19,7 @@ subprocess.check_call([sys.executable, "-m", "pip", "install", "ultralytics", "h
 import os
 import shutil
 import yaml
+import random
 from pathlib import Path
 from kaggle_secrets import UserSecretsClient
 from huggingface_hub import hf_hub_download, snapshot_download, HfApi
@@ -25,9 +29,9 @@ from ultralytics import YOLO
 HF_MODEL_REPO    = "roeiderman/Rummikub"
 HF_DATASET_REPO  = "roeiderman/rummikub-training-dataset"
 HF_MODEL_FILE    = "rummikub_best.pt"
-EPOCHS           = 50
-IMG_SIZE         = 640
-BATCH            = 8      # T4 GPU handles batch 8 for OBB
+EPOCHS           = 50     # Updated to match your model.train() parameter
+IMG_SIZE         = 1280   # Updated to match your model.train() parameter for reading tiny numbers
+BATCH            = 4      # T4 GPU handles batch 8 for OBB
 WORKING_DIR      = Path("/kaggle/working")
 
 CLASS_NAMES = {
@@ -47,7 +51,7 @@ CLASS_NAMES = {
 
 # ── Cache clearing (prevents corrupted labels from persisting) ──────────────
 def clear_dataset_cache(data_path):
-    for subset in ["train", "val"]:
+    for subset in ["train", "val", "test"]:
         cache_file = data_path / "labels" / f"{subset}.cache"
         if cache_file.exists():
             print(f"Removing old cache: {cache_file}")
@@ -81,37 +85,93 @@ snapshot_download(
 )
 print(f"Dataset downloaded: {dataset_raw_dir}")
 
-# ── 3. Dataset Preparation (80/20 split) ───────────────────────────────────
-print("\n=== Preparing Dataset Split (80/20) ===")
-all_images = sorted((dataset_raw_dir / "images").glob("*.jpg"))
-split = int(len(all_images) * 0.8)
-train_imgs, val_imgs = all_images[:split], all_images[split:]
+# ── 3. Dataset Preparation (80/10/10 split with white-background grouping) ─
+print("\n=== Preparing Dataset Split (80/10/10) ===")
+valid_extensions = {".jpg", ".jpeg", ".png"}
+img_dir = dataset_raw_dir / "images"
+lbl_dir = dataset_raw_dir / "labels"
+
+all_images = [f for f in img_dir.iterdir() if f.suffix.lower() in valid_extensions]
+print(f"Total raw images found: {len(all_images)}")
+
+image_groups = {}
+valid_base_names = []
+missing_labels = 0
+
+# Group images by base name to keep originals and _white variants together
+for img_path in all_images:
+    stem = img_path.stem
+    # Extract the base name (e.g., 'tile0001' from 'tile0001_white')
+    base_name = stem[:-6] if stem.endswith("_white") else stem
+
+    lbl_path = lbl_dir / f"{stem}.txt"
+    base_lbl_path = lbl_dir / f"{base_name}.txt"
+
+    # Use exact label if it exists, otherwise fallback to the base label
+    if lbl_path.exists():
+        active_lbl = lbl_path
+    elif base_lbl_path.exists():
+        active_lbl = base_lbl_path
+    else:
+        missing_labels += 1
+        continue
+
+    if base_name not in image_groups:
+        image_groups[base_name] = []
+        valid_base_names.append(base_name)
+
+    image_groups[base_name].append((img_path, active_lbl))
+
+print(f"Unique image groups created: {len(valid_base_names)}")
+if missing_labels > 0:
+    print(f"WARNING: Skipped {missing_labels} images due to missing labels.")
+
+if len(valid_base_names) == 0:
+    raise Exception("ERROR: No valid image/label pairs found. Aborting.")
+
+# Shuffle the GROUPS to mix images evenly
+random.seed(42)
+random.shuffle(valid_base_names)
+
+# 80/10/10 Split
+train_split = int(len(valid_base_names) * 0.8)
+val_split   = int(len(valid_base_names) * 0.9)
+
+train_bases = valid_base_names[:train_split]
+val_bases   = valid_base_names[train_split:val_split]
+test_bases  = valid_base_names[val_split:]
 
 data_path = WORKING_DIR / "dataset"
-for subset, imgs in [("train", train_imgs), ("val", val_imgs)]:
+for subset, bases in [("train", train_bases), ("val", val_bases), ("test", test_bases)]:
     (data_path / "images" / subset).mkdir(parents=True, exist_ok=True)
     (data_path / "labels" / subset).mkdir(parents=True, exist_ok=True)
-    for img in imgs:
-        shutil.copy(img, data_path / "images" / subset / img.name)
-        lbl = dataset_raw_dir / "labels" / (img.stem + ".txt")
-        if lbl.exists():
-            shutil.copy(lbl, data_path / "labels" / subset / lbl.name)
+
+    for base in bases:
+        for img_path, lbl_path in image_groups[base]:
+            shutil.copy(img_path, data_path / "images" / subset / img_path.name)
+            dest_lbl_name = f"{img_path.stem}.txt"
+            shutil.copy(lbl_path, data_path / "labels" / subset / dest_lbl_name)
+
+train_count = sum(len(image_groups[b]) for b in train_bases)
+val_count   = sum(len(image_groups[b]) for b in val_bases)
+test_count  = sum(len(image_groups[b]) for b in test_bases)
 
 data_yaml = WORKING_DIR / "data.yaml"
 with open(data_yaml, "w") as f:
     yaml.dump({
         "path": str(data_path),
         "train": "images/train",
-        "val": "images/val",
-        "nc": 54,
+        "val":   "images/val",
+        "test":  "images/test",
+        "nc":    54,
         "names": CLASS_NAMES
     }, f)
-print(f"Data ready: {len(train_imgs)} train, {len(val_imgs)} val images.")
+print(f"Data ready: {train_count} train, {val_count} val, {test_count} test total files.")
 
 # Clear stale caches before training
 clear_dataset_cache(data_path)
 
-# ── 4. Fine-tuning (same stable params as continue_training.py) ────────────
+# ── 4. Fine-tuning ─────────────────────────────────────────────────────────
 print(f"\n=== Starting Fine-tuning ({EPOCHS} epochs) ===")
 model = YOLO(model_path)
 model.train(
@@ -119,64 +179,64 @@ model.train(
     epochs=EPOCHS,
     imgsz=IMG_SIZE,
     batch=BATCH,
-    device=0,               # Kaggle NVIDIA GPU
-    amp=False,              # Disabled for stability (same as continue_training.py)
+    device=0,
+    amp=False,
     task='obb',
     project='runs/continue_train',
-    name='rummikub_continued',
+    name='rummikub_ultimate',
     patience=30,
     resume=False,
 
-    # Optimization — same as continue_training.py
-    optimizer='SGD',
-    lr0=0.00005,
+    # Optimization
+    optimizer='auto',
+    lr0=0.001,
     lrf=0.01,
-    momentum=0.937,
     weight_decay=0.0005,
 
-    # ALL augmentation DISABLED for OBB stability
-    degrees=0.0,
-    translate=0.0,
-    scale=0.0,
+    box=7.5,
+    cls=3.0,
+    dfl=1.5,
+
+    # Strategic augmentation
+    degrees=180.0,
+    translate=0.1,
+    scale=0.9,
+    mosaic=0.5,
+
+    close_mosaic=10,
+
+    # Fatal for digits — keep zero
     shear=0.0,
     perspective=0.0,
     flipud=0.0,
     fliplr=0.0,
-    mosaic=0.0,
-    mixup=0.0,
-    copy_paste=0.0,
-    auto_augment=None,      # Disable RandAugment/AutoAugment
-    erasing=0.0,            # Disable random erasing
 
-    # Color augmentation only (safe for OBB)
+    # Extreme lighting augmentation
     hsv_h=0.015,
     hsv_s=0.7,
-    hsv_v=0.4,
+    hsv_v=0.9,
+    bgr=0.3,
 
-    # Training behaviour
-    rect=False,
-    close_mosaic=0,
-    workers=4,              # Kaggle supports multiprocessing
+    workers=4,
     verbose=True,
     save_period=5,
 )
 
-# ── 5. Evaluate new model vs old model ─────────────────────────────────────
-print("\n=== Evaluating New Model vs Old Model ===")
+# ── 5. Evaluate new model vs old model on TEST set ─────────────────────────
+print("\n=== Evaluating New Model vs Old Model on TEST set ===")
 
 def get_map(m_path):
     m = YOLO(str(m_path))
-    res = m.val(data=str(data_yaml), imgsz=IMG_SIZE, device=0, verbose=False)
+    res = m.val(data=str(data_yaml), split='test', imgsz=IMG_SIZE, device=0, verbose=False)
     try:
         return res.obb.map
     except AttributeError:
         return res.box.map
 
-# Updated to match YOLO's actual save path for OBB tasks
-new_model_path = WORKING_DIR / "runs/obb/runs/continue_train/rummikub_continued/weights/best.pt"
+new_model_path = WORKING_DIR / 'runs/continue_train/rummikub_ultimate/weights/best.pt'
 old_map = get_map(model_path)
 new_map = get_map(new_model_path)
-print(f"Old mAP50: {old_map:.4f} | New mAP50: {new_map:.4f}")
+print(f"Old mAP50-95: {old_map:.4f} | New mAP50-95: {new_map:.4f}")
 
 # ── 6. Push to HF only if better ───────────────────────────────────────────
 if new_map >= old_map:
@@ -187,7 +247,7 @@ if new_map >= old_map:
         path_in_repo=HF_MODEL_FILE,
         repo_id=HF_MODEL_REPO,
         repo_type="model",
-        commit_message=f"Auto-retrain: mAP50 {old_map:.4f} -> {new_map:.4f}"
+        commit_message=f"Auto-retrain: mAP {old_map:.4f} -> {new_map:.4f}"
     )
     print("Model pushed to HuggingFace successfully.")
 else:
