@@ -162,6 +162,11 @@ export default function AnimatedSolutionScreen() {
     router.push('/leaderboard');
   };
 
+  const handleGoToChallenges = () => {
+    setCompletionModalVisible(false);
+    router.push('/challenges');
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -284,7 +289,7 @@ export default function AnimatedSolutionScreen() {
           <Pressable style={styles.modalCard} onPress={() => undefined}>
             <Text style={styles.modalTitle}>All Steps Completed</Text>
             <Text style={styles.modalDescription}>
-              Choose whether to capture your next move or view the leaderboard.
+              Choose whether to capture your next move, view the leaderboard, or try a challenge.
             </Text>
 
             <TouchableOpacity
@@ -301,6 +306,14 @@ export default function AnimatedSolutionScreen() {
               onPress={handleGoToLeaderboard}
             >
               <Text style={styles.leaderboardButtonText}>Leaderboard</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.challengesButton}
+              activeOpacity={0.85}
+              onPress={handleGoToChallenges}
+            >
+              <Text style={styles.challengesButtonText}>Challenges</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -572,8 +585,20 @@ boardContent: {
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
+    marginBottom: 12,
   },
   leaderboardButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  challengesButton: {
+    backgroundColor: '#ff9500',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  challengesButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
