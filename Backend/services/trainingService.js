@@ -108,12 +108,16 @@ async function recordCorrection({ detectionId, isRack, correctedTiles, imageWidt
     console.log(`[Retraining] Correction received — ${type}, detectionId: ${detectionId}`);
     console.log(`[Retraining] Corrected tiles: ${correctedTiles.length}, image: ${imageWidth}x${imageHeight}`);
 
-    const imagePath = path.join(TRAINING_IMAGES_DIR, `${detectionId}.jpg`);
+    const imagePath      = path.join(TRAINING_IMAGES_DIR, `${detectionId}.jpg`);
+    const whiteBgPath    = path.join(TRAINING_IMAGES_DIR, `${detectionId}_white.jpg`);
+    const uploadPath     = fs.existsSync(whiteBgPath) ? whiteBgPath : imagePath;
 
-    if (!fs.existsSync(imagePath)) {
-        console.error(`[Retraining] Image not found at: ${imagePath}`);
+    if (!fs.existsSync(uploadPath)) {
+        console.error(`[Retraining] Image not found at: ${uploadPath}`);
         throw new Error(`Training image not found for detectionId: ${detectionId}`);
     }
+
+    console.log(`[Retraining] Using ${fs.existsSync(whiteBgPath) ? 'white-background' : 'original'} image for upload.`);
 
     // Convert corrected tiles to YOLO OBB format
     const labelContent = tilesToYoloOBB(correctedTiles, imageWidth, imageHeight);
@@ -127,12 +131,13 @@ async function recordCorrection({ detectionId, isRack, correctedTiles, imageWidt
     );
     const fileName = `tile${counter.fileIndex}`;
 
-    // Upload image + label to HF Dataset
-    await uploadToHFDataset(fileName, imagePath, labelContent);
+    // Upload white-background image (or original as fallback) + label to HF Dataset
+    await uploadToHFDataset(fileName, uploadPath, labelContent);
 
-    // Delete local image after successful upload
-    fs.unlinkSync(imagePath);
-    console.log(`[Retraining] Local image deleted. Saved as ${fileName} on HF.`);
+    // Delete both local files after successful upload
+    if (fs.existsSync(whiteBgPath)) fs.unlinkSync(whiteBgPath);
+    if (fs.existsSync(imagePath))   fs.unlinkSync(imagePath);
+    console.log(`[Retraining] Local images deleted. Saved as ${fileName} on HF.`);
     console.log(`[Retraining] Counter: ${counter.count}/${RETRAIN_THRESHOLD}`);
 
     if (counter.count >= RETRAIN_THRESHOLD) {
@@ -231,11 +236,10 @@ function triggerKaggleTraining() {
 }
 
 function deleteTrainingImage(detectionId) {
-    const imagePath = path.join(TRAINING_IMAGES_DIR, `${detectionId}.jpg`);
-    if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-        console.log(`[Retraining] Deleted local image: ${detectionId}.jpg`);
-    }
+    const imagePath   = path.join(TRAINING_IMAGES_DIR, `${detectionId}.jpg`);
+    const whiteBgPath = path.join(TRAINING_IMAGES_DIR, `${detectionId}_white.jpg`);
+    if (fs.existsSync(imagePath))   { fs.unlinkSync(imagePath);   console.log(`[Retraining] Deleted local image: ${detectionId}.jpg`); }
+    if (fs.existsSync(whiteBgPath)) { fs.unlinkSync(whiteBgPath); console.log(`[Retraining] Deleted local image: ${detectionId}_white.jpg`); }
 }
 
 function cleanupAbandonedImages(maxAgeMs = 2 * 60 * 60 * 1000) { // default 2 hours

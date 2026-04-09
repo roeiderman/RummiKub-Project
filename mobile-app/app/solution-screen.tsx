@@ -104,7 +104,7 @@ export default function AnimatedSolutionScreen() {
         exiting={FadeOut}
       >
         <View style={[styles.tileBox, tileStateStyle]}>
-          {tile.isJoker ? (
+          {(tile.isJoker || tile.number === '0' || (tile.tile != null && tile.tile.toLowerCase().includes('joker'))) ? (
             <Image source={getJokerImageSource(tile)} style={styles.jokerImage} resizeMode="contain" />
           ) : (
             <Text
