@@ -73,7 +73,7 @@ function getRummikubSolution(rackArray, boardArrayOfArrays) {
 
         // Resolve absolute paths to ensure Node always finds the files
         // Adjust these paths based on where this JS file is relative to run_solver.py!
-        const pythonExecutable = 'python'; // OR point to your venv: path.join(__dirname, '../solver_engine/venv/Scripts/python.exe')
+        const pythonExecutable = process.env.PYTHON_PATH || 'python3';
         const scriptPath = path.join(__dirname, '../../solver_engine/run_solver.py');
 
         // Spawn the child process
