@@ -233,7 +233,7 @@ def get_map(m_path):
     except AttributeError:
         return res.box.map
 
-new_model_path = WORKING_DIR / 'runs/continue_train/rummikub_ultimate/weights/best.pt'
+new_model_path = WORKING_DIR / 'runs/obb/runs/continue_train/rummikub_ultimate/weights/best.pt'
 old_map = get_map(model_path)
 new_map = get_map(new_model_path)
 print(f"Old mAP50-95: {old_map:.4f} | New mAP50-95: {new_map:.4f}")
