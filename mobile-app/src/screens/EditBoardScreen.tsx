@@ -61,14 +61,16 @@ export default function EditBoardScreen() {
 
     const newGroups = [...groups];
     const tile = newGroups[selectedPos.groupIdx][selectedPos.tileIdx];
+    const nextIsJoker = number === 'joker';
+    const jokerColor = tile.color === 'Black' ? 'Black' : 'Red';
 
-    // Update number
-    tile.number = number === 'joker' ? '0' : number;
-    tile.isJoker = number === 'joker';
+    // Keep edited jokers in the same shape as model-detected jokers.
+    tile.number = nextIsJoker ? null : number;
+    tile.isJoker = nextIsJoker;
 
-    // Update tile string
-    if (number === 'joker') {
-      tile.tile = 'Joker';
+    if (nextIsJoker) {
+      tile.color = jokerColor;
+      tile.tile = `${jokerColor}_Joker`;
     } else {
       tile.tile = `${tile.color}_${number}`;
     }
@@ -81,12 +83,25 @@ export default function EditBoardScreen() {
 
     const newGroups = [...groups];
     const tile = newGroups[selectedPos.groupIdx][selectedPos.tileIdx];
+    const isJoker = tile.isJoker || (tile.tile != null && tile.tile.toLowerCase().includes('joker'));
+
+    if (isJoker && color !== 'Red' && color !== 'Black') {
+      Alert.alert(
+        'Invalid Joker Color',
+        'Jokers can only be Red or Black.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
 
     // Update color
     tile.color = color as "Blue" | "Red" | "Black" | "Orange";
 
-    // Update tile string (unless it's a joker)
-    if (tile.number !== '0' && tile.number !== 'joker' && tile.tile !== 'Joker') {
+    if (isJoker) {
+      tile.tile = `${color}_Joker`;
+      tile.number = null;
+      tile.isJoker = true;
+    } else {
       tile.tile = `${color}_${tile.number}`;
     }
 
@@ -101,7 +116,7 @@ export default function EditBoardScreen() {
     // Validate joker colors - must be Red or Black only
     const allTiles = groups.flat();
     const invalidJokers = allTiles.filter(tile => {
-      const isJoker = tile.number === '0' || tile.number === 'joker' || tile.tile === 'Joker';
+      const isJoker = tile.isJoker || (tile.tile != null && tile.tile.toLowerCase().includes('joker'));
       return isJoker && tile.color !== 'Red' && tile.color !== 'Black';
     });
 
@@ -127,11 +142,6 @@ export default function EditBoardScreen() {
       },
       message: `Detected ${groups.flat().length} tiles and ${groups.length} series`,
     };
-
-    // Print the updated board JSON
-    console.log('=== UPDATED BOARD JSON ===');
-    console.log(JSON.stringify(updatedBoardData, null, 2));
-    console.log('==========================');
 
     // Navigate back with visited flag, updated data, and whether edits were made
     router.navigate({

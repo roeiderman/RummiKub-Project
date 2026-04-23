@@ -1,8 +1,8 @@
 export interface TileData {
   id: number;
-  tile: string;  // "Blue_7", "Red_10", "Joker", etc.
+  tile: string;  // "Blue_7", "Red_10", "Red_Joker", etc.
   color: "Blue" | "Red" | "Black" | "Orange";
-  number: string;  // "1" to "13" or "0"/"joker"
+  number: string | null;  // "1" to "13" or null for Jokers
   isJoker: boolean;
   confidence: number;
   position: { x: number; y: number };
@@ -15,7 +15,7 @@ export interface RummikubTile {
   id: number;
   tile: string;
   color: 'Red' | 'Blue' | 'Black' | 'Orange';
-  number: string;
+  number: string | null;
   isJoker: boolean;
   _source?: 'board' | 'rack';
   _sourceGroupIndex?: number;
