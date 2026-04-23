@@ -52,7 +52,8 @@ export interface OptimizeResult {
   tilesUsed: number;
   rackTilesPlayed: RummikubTile[];
   finalBoard: RummikubTile[][];
-  moves: RummikubMove[]
+  moves: RummikubMove[] | null;
+  noMoves?: boolean;
 }
 
 export interface OptimizeResponse {

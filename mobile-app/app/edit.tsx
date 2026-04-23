@@ -172,11 +172,17 @@ export default function EditChooserScreen() {
 
       // Show results
       const optimizeData = result.data as any;
-      if (!optimizeData.success) {
+      const hasMoves = Array.isArray(optimizeData?.moves) && optimizeData.moves.length > 0;
+      const noMovesFound =
+        !optimizeData?.success ||
+        optimizeData?.noMoves === true ||
+        !hasMoves;
+
+      if (noMovesFound) {
         recordTurn(0).catch(() => {});
         Alert.alert(
           'No Move Found',
-          'No valid moves available with your current tiles.',
+          result?.message || 'No valid moves available with your current tiles.',
           [
             { text: 'OK', style: 'cancel' },
             { text: 'Upload New Images', onPress: () => router.replace('/home') },
