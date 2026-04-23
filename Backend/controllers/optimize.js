@@ -33,24 +33,53 @@ const optimize = async (req, res, next) => {
             throw error;
         }
 
+        const formattedBoard = groups.map((group, groupIndex) => {            
+            return group.map(tile => ({
+                ...tile,
+                _source: 'board',
+                _sourceGroupIndex: groupIndex 
+            }));
+        });
+
+        const formattedRack = rack.map(tile => ({
+            ...tile,
+            _source: 'rack', 
+            _sourceGroupIndex: null 
+        }));
+
         // Call service to find optimal move.
-        const result = await optimizeService.findOptimalMove(groups, rack);
+        const result = await optimizeService.getRummikubSolution(formattedRack, formattedBoard);
+        console.log(result)
         console.log('Optimal move result:', result.finalBoard ? result.finalBoard : 'No final board state available'); // Log the final board state for debugging.
+
+        const optimizerSucceeded = result.success === true || result.success === 'true';
+        const finalBoard = Array.isArray(result.finalBoard) ? result.finalBoard : [];
+        const rackTilesPlayed = finalBoard
+            .flat()
+            .filter(tile => tile.isRack === true);
+        const tilesUsed = rackTilesPlayed.length;
+        const noMoves = tilesUsed === 0;
 
         // Reconstruct the sequence of moves from initial state → final board.
         // Use rackTilesPlayed (not the full rack) so only actually-played rack tiles
         // are attributed as 'rack' source; everything else maps back to the board.
-        if (result.success && result.finalBoard) {
-            result.moves = reconstructMoves(groups, result.rackTilesPlayed || [], result.finalBoard);
+        if (optimizerSucceeded && !noMoves && finalBoard.length > 0) {
+            result.moves = reconstructMoves(groups, finalBoard);
+        } else {
+            result.moves = null;
         }
+        result.success = optimizerSucceeded;
+        result.noMoves = noMoves;
+        result.tilesUsed = tilesUsed;
+        result.rackTilesPlayed = rackTilesPlayed;
 
         // Auto-save as a training challenge scenario if algorithm removed >= 4 tiles
-        if (result.success && result.tilesUsed >= 4) {
+        if (optimizerSucceeded && tilesUsed >= 4) {
             const { maybeSaveScenario } = require('../services/scenarioService');
             const strip = t => ({ id: t.id, tile: t.tile, color: t.color, number: t.number, isJoker: t.isJoker });
             const cleanRack = rack.map(strip);
             const cleanBoard = groups.map(g => g.map(strip));
-            maybeSaveScenario(cleanRack, cleanBoard, result.tilesUsed)
+            maybeSaveScenario(cleanRack, cleanBoard, tilesUsed)
                 .catch(err => console.error('[Scenario] Auto-save failed:', err.message));
         }
 
@@ -58,9 +87,9 @@ const optimize = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: result,
-            message: result.tilesPlayed > 0
-                ? `Found optimal move: ${result.tilesPlayed} tile(s) played`
-                : 'No valid move found'
+            message: noMoves
+                ? 'No valid moves available with your current tiles.'
+                : `Found optimal move: ${tilesUsed} tile(s) played`
         });
     } catch (error) {
         // Handle board validation errors.
@@ -92,4 +121,3 @@ const optimize = async (req, res, next) => {
 };
 
 module.exports = { optimize };
-

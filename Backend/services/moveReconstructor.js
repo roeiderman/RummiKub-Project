@@ -169,14 +169,13 @@ function buildMoves(finalBoard, attributions, classifications) {
 /**
  * Main entry point.
  * @param {Array} initialBoard     - Board state before the move
- * @param {Array} rackTilesPlayed  - Only the rack tiles the optimizer actually played
  * @param {Array} finalBoard       - Optimal board returned by the optimizer (tiles carry _source tags)
  * @returns {Array} Ordered list of MoveObjects
  */
-function reconstructMoves(initialBoard, rackTilesPlayed, finalBoard) {
+function reconstructMoves(initialBoard, finalBoard) {
     if (!finalBoard || finalBoard.length === 0) return [];
 
-    const attributions    = readAttributions(finalBoard);
+    const attributions = readAttributions(finalBoard);
     const classifications = attributions.map(attr =>
         classifyGroup(attr, initialBoard || [])
     );
