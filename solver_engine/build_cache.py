@@ -25,28 +25,40 @@ def add_jokers_and_deduplicate(base_combos):
     for combo in base_combos:
         length = len(combo)
         
+        # If the number on the first tile matches the second, it's a Group.
+        num1 = combo[0].split('_')[1]
+        num2 = combo[1].split('_')[1]
+        is_group = (num1 == num2)
+        
+        def add_to_set(target_combo):
+            if is_group:
+                # Groups don't care about order. Sorting deduplicates them safely.
+                all_combos_with_jokers.add(tuple(sorted(target_combo)))
+            else:
+                # Runs must preserve their sequential order and exact Joker placement!
+                all_combos_with_jokers.add(tuple(target_combo))
+
         # 0 Jokers (The base combination itself)
-        all_combos_with_jokers.add(tuple(sorted(combo)))
+        add_to_set(combo)
         
         # 1 Joker: Replace 1 tile
         for i in range(length):
             temp_combo = combo.copy()
             temp_combo[i] = 'Black_Joker'
-            all_combos_with_jokers.add(tuple(sorted(temp_combo)))
+            add_to_set(temp_combo)
             
-        for i in range(length):
             temp_combo = combo.copy()
             temp_combo[i] = 'Red_Joker'
-            all_combos_with_jokers.add(tuple(sorted(temp_combo)))
+            add_to_set(temp_combo)
             
-        # 2 Jokers: Replace 2 tiles (if the game has 2 jokers)
+        # 2 Jokers: Replace 2 tiles
         for i, j in itertools.permutations(range(length), 2):
             temp_combo = combo.copy()
             temp_combo[i] = 'Red_Joker'
             temp_combo[j] = 'Black_Joker'
-            all_combos_with_jokers.add(tuple(sorted(temp_combo)))
+            add_to_set(temp_combo)
             
-    # Convert tuples back to lists for easier handling later
+    # Convert tuples back to lists for JSON output
     return [list(c) for c in all_combos_with_jokers]
 
 print("Building dictionary...")
