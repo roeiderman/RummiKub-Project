@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const { uploadFiles } = require('@huggingface/hub');
 const { isValidRun, isValidSet } = require('../utils/gameLogic');
 const ScenarioLeaderboard = require('../models/ScenarioLeaderboard');
+const User = require('../models/User');
 
 const HF_SCENARIOS_REPO = process.env.HF_SCENARIOS_REPO;
 const HF_TOKEN = process.env.HF_TOKEN;
@@ -49,6 +50,44 @@ function normalizeTile(t) {
     const number = String(t.number ?? '');
     const isJoker = t.isJoker ? '1' : '0';
     return `${color}|${number}|${isJoker}`;
+}
+
+/**
+ * Difficulty is a weighted composite of four signals:
+ *
+ *  1. Tiles removed (×3, dominant) — the more rack tiles the AI placed, the harder
+ *     the puzzle is: more tiles means a more complex solution path.
+ *
+ *  2. Rack utilization (×5) — placing 9 out of 10 tiles (90%) is harder than
+ *     placing 9 out of 14 (64%), because the solution space is much more constrained.
+ *
+ *  3. Board complexity (+0.5 per group, +0.2 per avg tile in group) — more groups
+ *     on the board mean more rearrangement options to evaluate, which makes finding
+ *     the right move harder.
+ *
+ *  4. Jokers in rack (−1.5 each) — a joker can substitute for any tile, so having
+ *     one makes forming valid groups much easier and lowers difficulty.
+ *
+ * Thresholds (score < 22 → easy, < 32 → medium, else → hard) were chosen to
+ * produce a rough equal split across realistic game states. Tune if real data
+ * shows all scenarios clustering in one tier.
+ */
+function computeDifficulty(rack, board, algorithmTilesRemoved) {
+    const jokerCountRack = rack.filter(t => t.isJoker).length;
+    const boardGroupCount = board.length;
+    const boardTileCount  = board.flat().length;
+    const utilization     = algorithmTilesRemoved / Math.max(rack.length, 1);
+
+    const score =
+        algorithmTilesRemoved * 3
+        + utilization * 5
+        + boardGroupCount * 0.5
+        + (boardTileCount / Math.max(boardGroupCount, 1)) * 0.2
+        - jokerCountRack * 1.5;
+
+    if (score < 22) return 'easy';
+    if (score < 32) return 'medium';
+    return 'hard';
 }
 
 function computeContentHash(rack, board) {
@@ -104,25 +143,28 @@ async function ensureLoaded() {
 // Save a scenario (fire-and-forget from optimize controller)
 // ---------------------------------------------------------------------------
 
-async function maybeSaveScenario(rack, board, algorithmTilesRemoved) {
+async function maybeSaveScenario(rack, board, algorithmTilesRemoved, createdBy = 'unknown') {
     if (!HF_SCENARIOS_REPO || !HF_TOKEN) return;
 
     const id = computeContentHash(rack, board);
     if (scenarioCache.has(id)) return;
 
+    const difficulty = computeDifficulty(rack, board, algorithmTilesRemoved);
     const scenario = {
         id,
         rack,
         board,
         algorithmTilesRemoved,
+        difficulty,
+        createdBy,
         recordHolder: null,
         createdAt: new Date().toISOString(),
     };
 
     scenarioCache.set(id, scenario);
-    console.log(`[Scenario] New scenario cached. id=${id}, tiles=${algorithmTilesRemoved}`);
+    console.log(`[Scenario] New scenario cached. id=${id}, tiles=${algorithmTilesRemoved}, difficulty=${difficulty}`);
 
-    const meta = { id, algorithmTilesRemoved, recordHolder: null, createdAt: scenario.createdAt };
+    const meta = { id, algorithmTilesRemoved, difficulty, createdBy, recordHolder: null, createdAt: scenario.createdAt };
 
     uploadQueue = uploadQueue.then(async () => {
         const str = (data) => JSON.stringify(data, null, 2);
@@ -279,16 +321,70 @@ async function submitAttempt(scenarioId, userEmail, submittedBoard, tilesPlaced)
     return { tilesPlaced, isNewRecord, previousRecord };
 }
 
+async function backfillDifficulty() {
+    if (!HF_SCENARIOS_REPO || !HF_TOKEN) return;
+
+    const toUpdate = Array.from(scenarioCache.values()).filter(s => !s.difficulty);
+    if (toUpdate.length === 0) return;
+
+    console.log(`[Scenario] Backfilling difficulty for ${toUpdate.length} scenario(s)...`);
+    for (const scenario of toUpdate) {
+        scenario.difficulty = computeDifficulty(scenario.rack, scenario.board, scenario.algorithmTilesRemoved);
+        scenarioCache.set(scenario.id, scenario);
+    }
+
+    uploadQueue = uploadQueue.then(async () => {
+        const str = (data) => JSON.stringify(data, null, 2);
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                const currentIndex = (await fetchFromHF('index.json')) || [];
+                const updatedIndex = currentIndex.map(m => {
+                    const s = scenarioCache.get(m.id);
+                    return s ? { ...m, difficulty: s.difficulty } : m;
+                });
+                await uploadFiles({
+                    repo: { type: 'dataset', name: HF_SCENARIOS_REPO },
+                    credentials: { accessToken: HF_TOKEN },
+                    files: [
+                        { path: 'index.json', content: new Blob([str(updatedIndex)], { type: 'application/json' }) },
+                        ...toUpdate.map(s => ({
+                            path: `scenario_${s.id}.json`,
+                            content: new Blob([str(s)], { type: 'application/json' }),
+                        })),
+                    ],
+                    commitTitle: `Backfill difficulty for ${toUpdate.length} scenario(s)`,
+                });
+                console.log(`[Scenario] Backfill complete. Updated ${toUpdate.length} scenario(s).`);
+                return;
+            } catch (err) {
+                if (err.statusCode === 412 && attempt < 3) {
+                    await new Promise(r => setTimeout(r, attempt * 1000));
+                } else {
+                    console.error('[Scenario] Backfill upload failed:', err.message);
+                    return;
+                }
+            }
+        }
+    });
+}
+
 function loadScenariosFromHF() {
-    ensureLoaded().catch(err => console.error('[Scenario] Startup load failed:', err.message));
+    ensureLoaded()
+        .then(() => backfillDifficulty())
+        .catch(err => console.error('[Scenario] Startup load failed:', err.message));
 }
 
 async function getScenarioLeaderboard(scenarioId) {
     const doc = await ScenarioLeaderboard.findOne({ scenarioId }).lean();
     if (!doc) return [];
-    return (doc.entries || [])
-        .sort((a, b) => b.bestScore - a.bestScore)
-        .slice(0, 50);
+
+    const entries = (doc.entries || []).sort((a, b) => b.bestScore - a.bestScore).slice(0, 50);
+
+    const emails = entries.map(e => e.email).filter(Boolean);
+    const users = await User.find({ email: { $in: emails } }, 'name email').lean();
+    const nameByEmail = Object.fromEntries(users.map(u => [u.email, u.name]));
+
+    return entries.map(e => ({ ...e, name: nameByEmail[e.email] ?? null }));
 }
 
 module.exports = { loadScenariosFromHF, maybeSaveScenario, listScenarios, getScenario, submitAttempt, getScenarioLeaderboard };
