@@ -341,11 +341,11 @@ The solver reads `solver_engine/valid_combinations.json` (all ~100 k pre-compute
 
 | Layer | Technology |
 |---|---|
-| Mobile | React Native 0.81, Expo 54, TypeScript, expo-router |
-| Backend | Node.js, Express 5, Mongoose, JWT, Multer, Helmet |
+| Mobile | React Native, Expo, TypeScript, expo-router |
+| Backend | Node.js, Express, Mongoose, JWT |
 | Database | MongoDB Atlas |
 | Tile Detection | Python, Ultralytics YOLOv8 OBB, BRIA RMBG-2.0 |
-| Solver | Python, PuLP (COIN-BC LP solver) |
+| Solver | Python, PuLP (LP solver) |
 | Model Hosting | HuggingFace Hub |
 | Retraining | Kaggle Notebooks (GPU) |
 
