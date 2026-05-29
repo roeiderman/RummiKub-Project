@@ -354,5 +354,7 @@ The solver reads `solver_engine/valid_combinations.json` (all ~100 k pre-compute
 ## Authors
 
 Roey Derman
+
 Dvir Hadad
+
 Meital Basael
