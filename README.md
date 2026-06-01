@@ -8,21 +8,21 @@
     </td>
     <td align="center">
       <img src="images/העלאת תמונות.jpeg" width="200"><br>
-      <b>Registration</b>
+      <b>Upload Images</b>
     </td>
     <td align="center">
       <img src="images/מסך עריכה2.jpeg" width="200"><br>
-      <b>Registration</b>
+      <b>Edit Rack/Table</b>
     </td>
   </tr>
   <tr>
     <td align="center">
       <img src="images/הצגת מהלך.jpeg" width="200"><br>
-      <b>Image Upload</b>
+      <b>Suggested Move</b>
     </td>
     <td align="center">
       <img src="images/אתגר2.jpeg" width="200"><br>
-      <b>Move Suggestion</b>
+      <b>Challenges</b>
     </td>
   </tr>
 </table>
