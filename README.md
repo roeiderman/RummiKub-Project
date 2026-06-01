@@ -12,7 +12,7 @@
     </td>
     <td align="center">
       <img src="images/מסך עריכה2.jpeg" width="200"><br>
-      <b>Edit Rack/Table</b>
+      <b>Edit Rack/Board</b>
     </td>
   </tr>
   <tr>
