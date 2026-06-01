@@ -1,8 +1,31 @@
 # RummiKub — AI-Powered Rummikub Assistant
 
-<img src="images/כניסה.jpeg" width="200"> <img src="images/העלאת תמונות.jpeg" width="200">
-<img src="images/מסך עריכה2.jpeg" width="200"> <img src="images/הצגת מהלך.jpeg" width="200">
-<img src="images/אתגר2.jpeg" width="200">
+<table>
+  <tr>
+    <td align="center">
+      <img src="images/כניסה.jpeg" width="200"><br>
+      <b>Sign In</b>
+    </td>
+    <td align="center">
+      <img src="images/העלאת תמונות.jpeg" width="200"><br>
+      <b>Registration</b>
+    </td>
+    <td align="center">
+      <img src="images/מסך עריכה2.jpeg" width="200"><br>
+      <b>Registration</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="images/הצגת מהלך.jpeg" width="200"><br>
+      <b>Image Upload</b>
+    </td>
+    <td align="center">
+      <img src="images/אתגר2.jpeg" width="200"><br>
+      <b>Move Suggestion</b>
+    </td>
+  </tr>
+</table>
 
 RummiKub is a full-stack mobile application that uses computer vision and linear programming to help players calculate the best possible move in any Rummikub game state. Point your camera at the board, the AI detects every tile, and the solver engine tells you exactly which tiles to play and where.
 
