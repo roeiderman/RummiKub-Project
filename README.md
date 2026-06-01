@@ -31,11 +31,6 @@ RummiKub is a full-stack mobile application that uses computer vision and linear
 
 ---
 
-## Demo
-
-> _Screenshots and video demo coming soon._
-
----
 
 ## Features
 
