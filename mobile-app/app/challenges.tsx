@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   RefreshControl,
+  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -11,36 +11,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import { Scenario, listScenarios } from '../src/services/scenarioService';
-import { TILE_COLORS } from '../src/constants/colors';
-import { RummikubTile } from '../src/types/tile';
 
-function RackPreview({ rack }: { rack: RummikubTile[] }) {
-  const preview = rack.slice(0, 12);
-  return (
-    <View style={styles.rackPreview}>
-      {preview.map((tile, i) => (
-        <View
-          key={i}
-          style={[
-            styles.tileChip,
-            { borderColor: TILE_COLORS[tile.color as keyof typeof TILE_COLORS] || TILE_COLORS.Black },
-          ]}
-        >
-          <Text
-            style={[
-              styles.tileChipText,
-              { color: TILE_COLORS[tile.color as keyof typeof TILE_COLORS] || TILE_COLORS.Black },
-            ]}
-          >
-            {tile.isJoker ? '★' : tile.number}
-          </Text>
-        </View>
-      ))}
-      {rack.length > 12 && (
-        <Text style={styles.moreText}>+{rack.length - 12}</Text>
-      )}
-    </View>
-  );
+function formatGameDate(iso: string): { date: string; time: string } {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return { date, time };
 }
 
 function ScenarioCard({ item, index, onPress, onLeaderboardPress }: {
@@ -82,9 +58,36 @@ function ScenarioCard({ item, index, onPress, onLeaderboardPress }: {
           <Ionicons name="chevron-forward" size={18} color="#999" />
         </View>
       </View>
-      <RackPreview rack={item.rack} />
+      <View style={styles.gameDateTime}>
+        <Ionicons name="calendar-outline" size={14} color="#888" />
+        <Text style={styles.gameDateText}>{formatGameDate(item.createdAt).date}</Text>
+        <Ionicons name="time-outline" size={14} color="#888" style={styles.timeIcon} />
+        <Text style={styles.gameDateText}>{formatGameDate(item.createdAt).time}</Text>
+      </View>
+      {item.createdBy && item.createdBy !== 'unknown' && (
+        <View style={styles.playedByRow}>
+          <Ionicons name="person-outline" size={13} color="#aaa" />
+          <Text style={styles.playedByText}>
+            Played by: {item.createdBy.split('@')[0]}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
+}
+
+const DIFFICULTY_ORDER = ['easy', 'medium', 'hard'] as const;
+const DIFFICULTY_LABELS: Record<string, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+
+function buildSections(scenarios: Scenario[]) {
+  const buckets: Record<string, Scenario[]> = { easy: [], medium: [], hard: [] };
+  for (const s of scenarios) {
+    const tier = s.difficulty ?? 'medium';
+    buckets[tier].push(s);
+  }
+  return DIFFICULTY_ORDER
+    .filter(tier => buckets[tier].length > 0)
+    .map(tier => ({ key: tier, title: DIFFICULTY_LABELS[tier], data: buckets[tier] }));
 }
 
 export default function ChallengesScreen() {
@@ -158,9 +161,9 @@ export default function ChallengesScreen() {
       ) : error ? (
         <Text style={styles.errorText}>{error}</Text>
       ) : (
-        <FlatList
+        <SectionList
           style={styles.list}
-          data={scenarios}
+          sections={buildSections(scenarios)}
           keyExtractor={(item) => item.id}
           renderItem={({ item, index }) => (
             <ScenarioCard
@@ -169,6 +172,13 @@ export default function ChallengesScreen() {
               onPress={() => handlePress(item)}
               onLeaderboardPress={() => handleLeaderboardPress(item)}
             />
+          )}
+          renderSectionHeader={({ section }) => (
+            <View style={[styles.sectionHeader, styles[`sectionHeader_${section.key}` as keyof typeof styles] as any]}>
+              <Text style={[styles.sectionHeaderText, styles[`sectionHeaderText_${section.key}` as keyof typeof styles] as any]}>
+                {section.title}
+              </Text>
+            </View>
           )}
           refreshControl={
             <RefreshControl
@@ -256,23 +266,29 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   firstBadgeText: { color: '#34C759', fontSize: 12, fontWeight: '600' },
-  rackPreview: {
+  gameDateTime: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 4,
-    alignItems: 'center',
   },
-  tileChip: {
-    width: 26,
-    height: 32,
-    borderWidth: 1.5,
-    borderRadius: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+  gameDateText: { fontSize: 13, color: '#666' },
+  timeIcon: { marginLeft: 8 },
+  playedByRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  playedByText: { fontSize: 12, color: '#aaa' },
+  sectionHeader: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
   },
-  tileChipText: { fontSize: 11, fontWeight: '800' },
-  moreText: { fontSize: 12, color: '#999', marginLeft: 2 },
+  sectionHeader_easy: { backgroundColor: '#E8F8EE' },
+  sectionHeader_medium: { backgroundColor: '#FFF4E0' },
+  sectionHeader_hard: { backgroundColor: '#FDE8E8' },
+  sectionHeaderText: { fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
+  sectionHeaderText_easy: { color: '#27AE60' },
+  sectionHeaderText_medium: { color: '#E67E22' },
+  sectionHeaderText_hard: { color: '#E74C3C' },
   emptyContainer: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 24 },
   emptyText: { fontSize: 18, color: '#666', marginTop: 16, fontWeight: '600' },
   emptySubText: { fontSize: 14, color: '#999', textAlign: 'center', marginTop: 8, lineHeight: 20 },

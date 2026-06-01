@@ -14,6 +14,8 @@ export interface Scenario {
   rack: RummikubTile[];
   board: RummikubTile[][];
   algorithmTilesRemoved: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  createdBy?: string;
   recordHolder: ScenarioRecord | null;
   createdAt: string;
 }
@@ -26,6 +28,7 @@ export interface AttemptResult {
 
 export interface ScenarioLeaderboardEntry {
   email: string;
+  name?: string | null;
   bestScore: number;
   attempts?: number;
   achievedAt?: string;

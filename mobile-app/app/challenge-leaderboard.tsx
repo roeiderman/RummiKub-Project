@@ -46,7 +46,7 @@ export default function ChallengeLeaderboardScreen() {
 
   const renderRow = ({ item, index }: { item: ScenarioLeaderboardEntry; index: number }) => {
     const isMe = !item.isAI && myEmail && item.email === myEmail;
-    const name = item.isAI ? 'AI' : (item.email ?? 'Unknown');
+    const name = item.isAI ? 'AI' : (item.name ?? item.email ?? 'Unknown');
     const rankLabel = index < 3 ? MEDALS[index] : `#${index + 1}`;
 
     return (

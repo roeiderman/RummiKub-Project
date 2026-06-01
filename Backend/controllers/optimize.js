@@ -79,7 +79,7 @@ const optimize = async (req, res, next) => {
             const strip = t => ({ id: t.id, tile: t.tile, color: t.color, number: t.number, isJoker: t.isJoker });
             const cleanRack = rack.map(strip);
             const cleanBoard = groups.map(g => g.map(strip));
-            maybeSaveScenario(cleanRack, cleanBoard, tilesUsed)
+            maybeSaveScenario(cleanRack, cleanBoard, tilesUsed, req.user?.email || 'unknown')
                 .catch(err => console.error('[Scenario] Auto-save failed:', err.message));
         }
 

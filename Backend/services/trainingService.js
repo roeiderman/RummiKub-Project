@@ -211,23 +211,45 @@ function ensureKaggleCredentials() {
 
 function triggerKaggleTraining() {
     ensureKaggleCredentials();
+
+    const hfToken = process.env.HF_TOKEN;
+    if (!hfToken) {
+        console.error('[Kaggle] HF_TOKEN not set in .env — cannot push retraining job');
+        return;
+    }
+
+    // Kaggle's CLI push resets secret attachments on every new version, so we inject
+    // the token into a temporary copy of the script before pushing. The temp directory
+    // is deleted immediately after. The kernel is private, so only the owner can see it.
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kaggle-push-'));
+    try {
+        const script = fs.readFileSync(path.join(KAGGLE_DIR, 'retrain_model_in_kaggle.py'), 'utf8');
+        const injected = script.replace(
+            'secrets = UserSecretsClient()\nhf_token = secrets.get_secret("HF_TOKEN")',
+            `hf_token = "${hfToken}"`
+        );
+        fs.writeFileSync(path.join(tmpDir, 'retrain_model_in_kaggle.py'), injected, 'utf8');
+        fs.copyFileSync(
+            path.join(KAGGLE_DIR, 'kernel-metadata.json'),
+            path.join(tmpDir, 'kernel-metadata.json')
+        );
+    } catch (err) {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        console.error('[Kaggle] Failed to prepare push directory:', err.message);
+        return;
+    }
+
     console.log('[Kaggle] Pushing retraining job...');
+    const env = { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' };
 
-    const env = {
-        ...process.env,
-        PYTHONUTF8: '1',           // Python 3.7+ UTF-8 mode — fixes charmap errors on Windows
-        PYTHONIOENCODING: 'utf-8', // Fallback for older Python versions
-    };
+    exec(`"${KAGGLE_CLI}" kernels push -p "${tmpDir}"`, { env, encoding: 'utf8' }, (error, stdout, stderr) => {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
 
-    exec(`"${KAGGLE_CLI}" kernels push -p "${KAGGLE_DIR}"`, { env, encoding: 'utf8' }, (error, stdout, stderr) => {
-        // Filter out the SSL warning — it's noise, not a real error
         const realStderr = stderr.replace(/.*NotOpenSSLWarning.*\n?/g, '').trim();
-
         if (stdout) console.log('[Kaggle]', stdout.trim());
         if (realStderr) console.error('[Kaggle] stderr:', realStderr);
         if (error) {
             console.error('[Kaggle] Failed to push job. Exit code:', error.code);
-            console.error('[Kaggle] Make sure ~/.kaggle/kaggle.json exists or KAGGLE_USERNAME/KAGGLE_KEY are set in .env');
         } else {
             console.log('[Kaggle] Job pushed successfully. Starting status polling...');
             setTimeout(pollKaggleStatus, 30 * 1000);
