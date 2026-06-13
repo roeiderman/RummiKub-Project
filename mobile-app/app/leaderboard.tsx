@@ -69,7 +69,7 @@ export default function LeaderboardScreen() {
       {/* Table header */}
       <View style={styles.tableHeader}>
         <Text style={[styles.headerCell, styles.rankCell]}>#</Text>
-        <Text style={[styles.headerCell, styles.emailCell]}>Email</Text>
+        <Text style={[styles.headerCell, styles.emailCell]}>Name</Text>
         <Text style={[styles.headerCell, styles.statCell]}>Turns</Text>
         <Text style={[styles.headerCell, styles.statCell]}>Max Tiles</Text>
       </View>
@@ -85,7 +85,7 @@ export default function LeaderboardScreen() {
           renderItem={({ item, index }) => (
             <View style={[styles.row, index % 2 === 0 && styles.rowEven]}>
               <Text style={[styles.cell, styles.rankCell]}>{index + 1}</Text>
-              <Text style={[styles.cell, styles.emailCell]} numberOfLines={1}>{item.email}</Text>
+              <Text style={[styles.cell, styles.emailCell]} numberOfLines={1}>{item.name}</Text>
               <Text style={[styles.cell, styles.statCell]}>{item.totalTurns}</Text>
               <Text style={[styles.cell, styles.statCell, sortBy === 'maxTilesInOneTurn' && styles.highlightedStat]}>
                 {item.maxTilesInOneTurn}
