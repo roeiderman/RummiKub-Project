@@ -5,7 +5,7 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 export type LeaderboardSortBy = 'maxTilesInOneTurn' | 'totalTurns';
 
 export interface LeaderboardEntry {
-  email: string;
+  name: string;
   totalTurns: number;
   maxTilesInOneTurn: number;
 }

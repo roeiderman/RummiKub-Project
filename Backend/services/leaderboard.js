@@ -3,6 +3,7 @@
  */
 
 const LeaderboardStats = require('../models/LeaderboardStats');
+const User = require('../models/User');
 
 /**
  * Create a leaderboard entry for a newly registered user.
@@ -36,9 +37,14 @@ const getLeaderboard = async (sortBy = 'maxTilesInOneTurn') => {
     const entries = await LeaderboardStats.find({})
         .sort({ [sortField]: -1 })
         .limit(50)
-        .select('email totalTurns maxTilesInOneTurn -_id');
+        .select('email totalTurns maxTilesInOneTurn -_id')
+        .lean();
 
-    return entries;
+    const emails = entries.map(e => e.email);
+    const users = await User.find({ email: { $in: emails } }, 'name email').lean();
+    const nameByEmail = Object.fromEntries(users.map(u => [u.email, u.name]));
+
+    return entries.map(e => ({ name: nameByEmail[e.email] ?? e.email, totalTurns: e.totalTurns, maxTilesInOneTurn: e.maxTilesInOneTurn }));
 };
 
 /**
