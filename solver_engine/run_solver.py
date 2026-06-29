@@ -3,38 +3,41 @@ import json
 import pulp
 import os
 
+# Builds and solves the ILP model: assigns all ~2500 valid combinations to tiles,
+# minimizing unused rack tiles (×1) and unused board tiles (×10000).
+# At least one rack tile must be placed. Returns which combinations to use.
 def solve_rummikub_turn(board_pool, rack_pool, valid_combinations):
-    """The math engine upgraded with Slack Variables, None-safety, and Ghost-Tile prevention"""
-    
-    # --- THE FIX: Learn all possible tiles in the universe first ---
+
+    # Build the universe of all tile types across combinations, board and rack
     all_tile_types = set()
     for combo in valid_combinations:
         for tile in combo:
             all_tile_types.add(tile)
-            
-    # Also add any weird edge-case tiles from the input JSON
     all_tile_types = all_tile_types.union(set(board_pool.keys())).union(set(rack_pool.keys()))
-    
-    # Now, if you don't own the tile, it safely gets assigned a strict 0!
+
+    # Merge board and rack into one pool: total count of each tile type available
     total_pool = {t: board_pool.get(t, 0) + rack_pool.get(t, 0) for t in all_tile_types}
-        
+
     prob = pulp.LpProblem("Rummikub_Turn", pulp.LpMinimize)
-    
+
+    # x[j]: how many times combination j is used. u_rack/u_board: unused tile slack variables
     x = {j: pulp.LpVariable(f"combo_{j}", lowBound=0, cat='Integer') for j in range(len(valid_combinations))}
-    
     u_rack = {tile: pulp.LpVariable(f"urack_{tile}", lowBound=0, upBound=rack_pool.get(tile, 0), cat='Integer') for tile in all_tile_types}
     u_board = {tile: pulp.LpVariable(f"uboard_{tile}", lowBound=0, upBound=board_pool.get(tile, 0), cat='Integer') for tile in all_tile_types}
-        
+
+    # Objective: minimize unused tiles. Board slack penalized heavily to prevent breaking existing groups
     prob += pulp.lpSum([u_rack[tile] + 10000 * u_board[tile] for tile in all_tile_types])
-    
+
+    # Conservation constraint: every tile must go somewhere — into a combination or into slack
     for tile in all_tile_types:
         combinations_using_tile = [x[j] * combo.count(tile) for j, combo in enumerate(valid_combinations) if tile in combo]
         prob += pulp.lpSum(combinations_using_tile) + u_rack[tile] + u_board[tile] == total_pool[tile]
 
+    # Force at least one rack tile to be placed (prevents the trivial all-slack solution)
     total_rack_count = sum(rack_pool.values())
     if total_rack_count > 0:
         prob += pulp.lpSum([u_rack[tile] for tile in rack_pool.keys()]) <= total_rack_count - 1
-        
+
     prob.solve(pulp.PULP_CBC_CMD(msg=False)) 
     
     if pulp.LpStatus[prob.status] == 'Optimal':
@@ -58,8 +61,11 @@ def solve_rummikub_turn(board_pool, rack_pool, valid_combinations):
         
     return {"error": True, "message": "Math model crashed entirely."}
 
+# The solver returns a list of combinations, each combination is a list of abstract type strings
+# (e.g. [["Red_5", "Red_6", "Red_7"], ...]). This function replaces each string with the real
+# JSON tile object (corners, position, isRack, etc.), preferring rack tiles over board tiles
+# when both have the same type.
 def assign_json_tiles_to_solution(solver_combinations, all_json_tiles):
-    """Re-attaches your original JSON objects"""
     final_moves = []
     available_tiles_by_type = {}
     

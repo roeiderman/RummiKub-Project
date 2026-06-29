@@ -1,4 +1,5 @@
 const optimizeService = require('../services/optimize');
+const { validateBoard } = optimizeService;
 const { reconstructMoves } = require('../services/moveReconstructor');
 
 /**
@@ -30,6 +31,15 @@ const optimize = async (req, res, next) => {
             const error = new Error('Each group must be an array of tiles');
             error.statusCode = 400;
             error.type = 'ValidationError';
+            throw error;
+        }
+
+        const boardValidation = validateBoard(groups);
+        if (!boardValidation.valid) {
+            const error = new Error('Board contains invalid groups');
+            error.statusCode = 400;
+            error.type = 'BoardInvalidError';
+            error.details = { invalidGroups: boardValidation.errors };
             throw error;
         }
 
