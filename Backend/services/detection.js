@@ -23,10 +23,12 @@ const performDetection = async (imageBuffer, options = {}) => {
             //const tilesWithSeries = gameLogic.assignSeriesToTiles(result.tiles, series);
 
             groups.forEach(group => {
-                if (!(group[0].number + 1 == group[1].number ||
-                    group[0].number + 2 == group[2].number)
-                ) {
-                    group.reverse()
+                if (group.length >= 3) {
+                    if (!(group[0].number + 1 == group[1].number ||
+                        group[0].number + 2 == group[2].number))
+                    {
+                        group.reverse()
+                    }
                 }
             });
 

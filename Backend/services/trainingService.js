@@ -103,6 +103,12 @@ async function uploadToHFDataset(fileName, imagePath, labelContent) {
     await uploadQueue;
 }
 
+// Called when a user corrects a detection. The user only corrects the tile identity (color/number),
+// not its position — so we take the original corners from the detection and the corrected class ID
+// from the user, normalize the corners to 0-1 range, and build a YOLO OBB label file.
+// Uploads the white-background image (or original as fallback) + label to HF dataset,
+// then deletes both local image files to save disk space.
+// When the correction counter reaches 100, resets it and triggers a Kaggle retraining job.
 async function recordCorrection({ detectionId, isRack, correctedTiles, imageWidth, imageHeight }) {
     const type = isRack ? 'rack' : 'board';
     console.log(`[Retraining] Correction received — ${type}, detectionId: ${detectionId}`);
@@ -209,6 +215,12 @@ function ensureKaggleCredentials() {
     }
 }
 
+// Pushes a new version of the retraining script to Kaggle and triggers a run.
+// HF_TOKEN is injected directly into a temp copy of the script because Kaggle CLI
+// resets secret attachments on every push. Temp dir is deleted after push completes.
+// The push runs as a non-blocking child process — Node.js continues handling requests
+// while it runs. When it finishes, the callback cleans up the temp dir and starts
+// polling Kaggle every 2 minutes until the job finishes.
 function triggerKaggleTraining() {
     ensureKaggleCredentials();
 
